@@ -16,66 +16,77 @@ public:
    void construct_psup(const bool all_points=true);
    void compute_carea();
 
-   unsigned int get_n_vertex()
+   inline unsigned int get_n_vertex()
    {
       return n_vertex;
    }
 
-   unsigned int get_n_cell()
+   inline unsigned int get_n_cell()
    {
       return n_cell;
    }
 
-   unsigned int get_n_tri()
+   inline unsigned int get_n_tri()
    {
       return n_tri;
    }
 
-   unsigned int get_n_quad()
+   inline unsigned int get_n_quad()
    {
       return n_quad;
    }
 
-   unsigned int get_n_bface()
+   inline unsigned int get_n_bface()
    {
       return n_bface;
    }
 
-   const double* get_coord(unsigned int i)
+   inline const double* get_coord(unsigned int i)
    {
       return &coord[i*dim];
    }
 
-   double get_cell_area(unsigned int i)
+   inline const double& get_cell_area(unsigned int i)
    {
       return carea[i];
    }
 
-   const double* get_face_normal(unsigned int i)
+   // We are assuming linear edge
+   inline const unsigned int* get_iface_vertices(unsigned int i)
    {
-      return &fnorm[i*dim];
+      return &iface[2*i];
    }
 
-   const double* get_bface_normal(unsigned int i)
+   inline const double& get_iface_length(unsigned int i)
+   {
+      return iface_len[i];
+   }
+
+   inline const double* get_iface_normal(unsigned int i)
+   {
+      return &iface_norm[i*dim];
+   }
+
+   inline const double* get_bface_normal(unsigned int i)
    {
       return &bface_norm[i*dim];
    }
 
-   std::pair<unsigned int,const unsigned int*> get_cell_vertices(unsigned int i)
+   inline std::pair<unsigned int,const unsigned int*> get_cell_vertices(unsigned int i)
    {
       unsigned int start = cell2[i];
       unsigned int end = cell2[i+1];
       return std::make_pair(end-start,&cell1[start]);
    }
 
-   std::pair<unsigned int,const unsigned int*> get_esup(unsigned int i)
+   inline std::pair<unsigned int,const unsigned int*> get_esup(unsigned int i)
    {
       unsigned int start = esup2[i];
       unsigned int end = esup2[i+1];
       return std::make_pair(end-start,&esup1[start]);
    }
 
-   std::pair<unsigned int,const unsigned int*> get_psup(unsigned int i)
+   inline std::pair<unsigned int,const unsigned int*> get_psup(unsigned int i)
    {
       unsigned int start = psup2[i];
       unsigned int end = psup2[i+1];
@@ -101,12 +112,13 @@ private:
    unsigned int *bface_cell; // cell adjacent to boundary face
    int          *bface_type; // type read from grid file, used for bc
    double       *bface_norm; // unit outward normal
+   double       *bface_len;  // length of face
 
    // Interior faces
-   double       *flen;  // length of face
-   unsigned int *face;  // vertex numbers for each face
-   double       *fnorm; // unit normal to face
-   unsigned int *fcell; // cells adjacent to face
+   double       *iface_len;  // length of face
+   unsigned int *iface;      // vertex numbers for each face
+   double       *iface_norm; // unit normal to face
+   unsigned int *iface_cell; // cells adjacent to face
 
    bool         has_esup;
    bool         has_psup;
