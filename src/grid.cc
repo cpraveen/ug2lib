@@ -318,7 +318,6 @@ void Grid::construct_psup(const bool all_points)
    construct_esup(); // psup needs esup data
    cout << "Constructing points surrounding point ... ";
 
-
    psup2 = new unsigned int[n_vertex+1];
    unsigned int* lpoin = new unsigned int[n_vertex]; // Help array to avoid duplication from neighbouring cells
 

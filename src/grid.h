@@ -19,7 +19,10 @@ public:
    void construct_iface();
    void construct_esuf();
    void construct_esue(const esue_type type);
-   void compute_carea();
+   void compute_cell_area();
+   void compute_face_normal();
+   void compute_cell_centroid();
+   void compute_face_centroid();
 
    inline unsigned int get_n_vertex()
    {
