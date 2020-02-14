@@ -318,11 +318,9 @@ void Grid::construct_psup(const bool all_points)
    construct_esup(); // psup needs esup data
    cout << "Constructing points surrounding point ... ";
 
-   unsigned int* lpoin; // Help array to avoid duplication from neighbouring cells
-   std::vector<unsigned int> psup1_temp(0);  // temporary vector to allow resize function
-   unsigned int istor = 0, gnode = 0;
+
    psup2 = new unsigned int[n_vertex+1];
-   lpoin = new unsigned int[n_vertex];
+   unsigned int* lpoin = new unsigned int[n_vertex]; // Help array to avoid duplication from neighbouring cells
 
    // Initialize
    for(unsigned int i=0; i<n_vertex; ++i)
@@ -332,6 +330,8 @@ void Grid::construct_psup(const bool all_points)
    }
    psup2[n_vertex] = 0;
 
+   std::vector<unsigned int> psup1_temp(0);  // temporary vector to allow resize function
+   unsigned int istor = 0;
    for(unsigned int ipoint=0; ipoint<n_vertex; ++ipoint) // Loop over all the nodes
    {
       auto esup = get_esup(ipoint); // get cells surrounding the node
@@ -340,7 +340,7 @@ void Grid::construct_psup(const bool all_points)
          auto cell = get_cell_vertices(esup.second[icell]);
          for(unsigned int jpoint=0; jpoint<cell.first; ++jpoint) // Loop over nodes of cell
          {
-            gnode = cell.second[jpoint];  // global node number
+            unsigned int gnode = cell.second[jpoint];  // global node number
             if(gnode != ipoint && lpoin[gnode] != ipoint+1) // check for duplication
             {
                if(all_points == true) // get all the points surrounding the node
@@ -416,7 +416,7 @@ void Grid::construct_iface()
             std::vector<unsigned int> inter(std::min(esup_node1.first, esup_node2.first));
             auto ls = std::set_intersection(cell_node1.begin(), cell_node1.end(),
                                             cell_node2.begin(), cell_node2.end(), inter.begin());
-            unsigned int n_esuf = ls-inter.begin(); // number of faces surrounding the element
+            unsigned int n_esuf = ls - inter.begin(); // number of faces surrounding the element
 
             if(n_esuf == 2)   // interior face
             {
@@ -551,12 +551,12 @@ void Grid::construct_esuf()
 
 // Find cells surrounding a cell
 // type = 0 => face connected neighbours only, 1 => all neighbours including the node connected ones
-void Grid::construct_esue(const bool type)
+void Grid::construct_esue(const esue_type type)
 {
    if(has_esue) return;
-   if(type == 1)  // Moore neighbours
+   if(type == esue_moore)  // Moore neighbours
       construct_esup();
-   else  // Von-Neumann neighbours
+   else if(type == esue_neumann)  // Von-Neumann neighbours
       construct_esuf();
    std::cout << "Constructing elements surrounding element ... ";
 
@@ -565,7 +565,7 @@ void Grid::construct_esue(const bool type)
    for(unsigned int i=0; i<=n_cell; ++i)
       esue2[i] = 0;
 
-   if(type == 1)  // Moore neighbours (we construct this similar to psup)
+   if(type == esue_moore)  // Moore neighbours (we construct this similar to psup)
    {
       unsigned int* lelem = new unsigned int[n_cell]; // help array to avoid duplication
       for(unsigned int i=0; i<n_cell; ++i)

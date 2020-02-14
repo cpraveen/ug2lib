@@ -9,5 +9,5 @@ int main()
    grid.construct_psup();
    grid.construct_iface();
    grid.construct_esuf();
-   grid.construct_esue();
+   grid.construct_esue(Grid::esue_neumann);
 }

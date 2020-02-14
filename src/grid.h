@@ -8,6 +8,8 @@ using namespace std;
 class Grid
 {
 public:
+   enum esue_type {esue_neumann, esue_moore};
+
    Grid();
    ~Grid();
    void read_gmsh(const string grid_file);
@@ -16,7 +18,7 @@ public:
    void construct_psup(const bool all_points=true);
    void construct_iface();
    void construct_esuf();
-   void construct_esue(const bool type=0);
+   void construct_esue(const esue_type type);
    void compute_carea();
 
    inline unsigned int get_n_vertex()
