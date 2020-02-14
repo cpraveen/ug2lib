@@ -8,8 +8,8 @@ using namespace std;
 class Grid
 {
 public:
-   Grid ();
-   ~Grid ();
+   Grid();
+   ~Grid();
    void read_gmsh(const string grid_file);
    void write_vtk(const string grid_file);
    void construct_esup();
@@ -126,30 +126,30 @@ public:
 private:
    const int    dim = 2;
    unsigned int n_vertex, n_cell, n_tri, n_quad, n_bface, n_iface;
-   double       *coord;
+   double*       coord;
 
    // cell data
-   unsigned int *cell1, *cell2;
-   int          *ctype;
-   double       *carea;
+   unsigned int* cell1, *cell2;
+   int*          ctype;
+   double*       carea;
 
    // connectivity information
-   unsigned int *esup1, *esup2;
-   unsigned int *psup1, *psup2;
-   unsigned int *esue1, *esue2;
+   unsigned int* esup1, *esup2;
+   unsigned int* psup1, *psup2;
+   unsigned int* esue1, *esue2;
 
    // boundary face data
-   unsigned int *bface;      // vertices forming the face
-   unsigned int *bface_cell; // cell adjacent to boundary face
-   int          *bface_type; // type read from grid file, used for bc
-   double       *bface_norm; // unit outward normal
-   double       *bface_len;  // length of face
+   unsigned int* bface;      // vertices forming the face
+   unsigned int* bface_cell; // cell adjacent to boundary face
+   int*          bface_type; // type read from grid file, used for bc
+   double*       bface_norm; // unit outward normal
+   double*       bface_len;  // length of face
 
    // Interior faces
-   double       *iface_len;  // length of face
-   unsigned int *iface;      // vertex numbers for each face
-   double       *iface_norm; // unit normal to face
-   unsigned int *iface_cell; // cells adjacent to face
+   double*       iface_len;  // length of face
+   unsigned int* iface;      // vertex numbers for each face
+   double*       iface_norm; // unit normal to face
+   unsigned int* iface_cell; // cells adjacent to face
 
    bool         has_esup;
    bool         has_psup;
@@ -158,11 +158,13 @@ private:
    bool         has_esue;
 };
 
-//Calculates the cross product (ca x cb)
-inline bool orient(const double *a, const double *b, const double *c)
+// Calculates the cross product (ca x cb)
+inline bool orient(const double* a, const double* b, const double* c)
 {
    double ar = (a[0]-c[0])*(b[1]-c[1]) - (b[0]-c[0])*(a[1]-c[1]);
-   if (ar<0) return 0;  //c is to the right of ab vector
-   else return 1;  //c is to the left of ab vector
+   if(ar < 0)
+      return 0;  // c is to the right of ab vector
+   else
+      return 1;  // c is to the left of ab vector
 }
 

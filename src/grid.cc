@@ -318,7 +318,7 @@ void Grid::construct_psup(const bool all_points)
    construct_esup(); // psup needs esup data
    cout << "Constructing points surrounding point ... ";
 
-   unsigned int *lpoin; // Help array to avoid duplication from neighbouring cells
+   unsigned int* lpoin; // Help array to avoid duplication from neighbouring cells
    std::vector<unsigned int> psup1_temp(0);  // temporary vector to allow resize function
    unsigned int istor = 0, gnode = 0;
    psup2 = new unsigned int[n_vertex+1];
@@ -331,7 +331,7 @@ void Grid::construct_psup(const bool all_points)
       lpoin[i] = 0;
    }
    psup2[n_vertex] = 0;
-   
+
    for(unsigned int ipoint=0; ipoint<n_vertex; ++ipoint) // Loop over all the nodes
    {
       auto esup = get_esup(ipoint); // get cells surrounding the node
@@ -379,46 +379,46 @@ void Grid::construct_psup(const bool all_points)
    cout << "Done\n";
 }
 
-//Find all the interior faces with corresponding node numbers
+// Find all the interior faces with corresponding node numbers
 void Grid::construct_iface()
 {
    if(has_iface) return;
-   construct_psup();	//construct psup data
+   construct_psup(); // construct psup data
    cout << "Constructing faces ... ";
    n_iface = 0;
-   std::vector<unsigned int> face_temp(0);	//to enable resize function
+   std::vector<unsigned int> face_temp(0); // to enable resize function
 
-   for (unsigned int ipoint=0; ipoint<n_vertex; ++ipoint)	//Loop over all the nodes
+   for(unsigned int ipoint=0; ipoint<n_vertex; ++ipoint) // Loop over all the nodes
    {
-      auto psup = get_psup(ipoint);		//get the nodes connected to ipoint
-      for (unsigned int jpoint=0; jpoint<psup.first; ++jpoint)	//loop over the surrounding points
+      auto psup = get_psup(ipoint);    // get the nodes connected to ipoint
+      for(unsigned int jpoint=0; jpoint<psup.first; ++jpoint)  // loop over the surrounding points
       {
-         //check if the face is not already defined with a previous ipoint
-         if (ipoint<psup.second[jpoint])	
+         // check if the face is not already defined with a previous ipoint
+         if(ipoint<psup.second[jpoint])
          {
-            //Get esup for both nodes and take intersection 
-            //2 cells => directly connected and interior face, 
-            //1 cell => either not connected by an edge or a boundary face
-            auto esup_node1 = get_esup(ipoint);  //get elements surrounding node1
-            auto esup_node2 = get_esup(psup.second[jpoint]);  //get elements surrounding node2
+            // Get esup for both nodes and take intersection
+            // 2 cells => directly connected and interior face,
+            // 1 cell => either not connected by an edge or a boundary face
+            auto esup_node1 = get_esup(ipoint);  // get elements surrounding node1
+            auto esup_node2 = get_esup(psup.second[jpoint]);  // get elements surrounding node2
             std::vector<unsigned int> cell_node1(esup_node1.first);
-            std::vector<unsigned int> cell_node2(esup_node2.first);            
-            for (unsigned int i=0; i<esup_node1.first; ++i)
+            std::vector<unsigned int> cell_node2(esup_node2.first);
+            for(unsigned int i=0; i<esup_node1.first; ++i)
                cell_node1[i] = esup_node1.second[i];
-            for (unsigned int i=0; i<esup_node2.first; ++i)
+            for(unsigned int i=0; i<esup_node2.first; ++i)
                cell_node2[i] = esup_node2.second[i];
-      
-            //Sort the arrays, needed for intersection
+
+            // Sort the arrays, needed for intersection
             std::sort(cell_node1.begin(), cell_node1.end());
             std::sort(cell_node2.begin(), cell_node2.end());
 
-            //find the intersection
+            // find the intersection
             std::vector<unsigned int> inter(std::min(esup_node1.first, esup_node2.first));
             auto ls = std::set_intersection(cell_node1.begin(), cell_node1.end(),
                                             cell_node2.begin(), cell_node2.end(), inter.begin());
-            unsigned int n_esuf = ls-inter.begin(); //number of faces surrounding the element
-            
-            if(n_esuf == 2)   //interior face
+            unsigned int n_esuf = ls-inter.begin(); // number of faces surrounding the element
+
+            if(n_esuf == 2)   // interior face
             {
                unsigned int istor = face_temp.size();
                face_temp.resize(face_temp.size()+2);
@@ -430,7 +430,7 @@ void Grid::construct_iface()
       }
    }
    iface = new unsigned int[face_temp.size()];
-   for (unsigned int i=0; i<face_temp.size(); ++i)	//copy the data from temporary vector
+   for(unsigned int i=0; i<face_temp.size(); ++i)  // copy the data from temporary vector
       iface[i] = face_temp[i];
 
    face_temp.resize(0);
@@ -438,59 +438,59 @@ void Grid::construct_iface()
    cout << "Done\n";
    cout << "Total number of interior faces = " << n_iface << endl;
 }
-   
-//Find neighbouring cells for a face
+
+// Find neighbouring cells for a face
 void Grid::construct_esuf()
 {
-   if (has_esuf) return;
+   if(has_esuf) return;
    construct_iface();
    cout << "Constructing elements surrounding face ... ";
-   
+
    //Interior Faces
    iface_cell = new unsigned int[2*n_iface];
-   for (unsigned int jface=0; jface<n_iface; ++jface)   //loop over all the faces
+   for(unsigned int jface=0; jface<n_iface; ++jface)    //loop over all the faces
    {
-      auto nface = get_iface_vertices(jface); //get the nodes for the face
+      auto nface = get_iface_vertices(jface); // get the nodes for the face
       unsigned int node1 = nface[0];
       unsigned int node2 = nface[1];
-      auto esup_node1 = get_esup(node1);  //get elements surrounding node1
-      auto esup_node2 = get_esup(node2);  //get elements surrounding node2
+      auto esup_node1 = get_esup(node1);  //g et elements surrounding node1
+      auto esup_node2 = get_esup(node2);  // get elements surrounding node2
       std::vector<unsigned int> cell_node1(esup_node1.first);
-      std::vector<unsigned int> cell_node2(esup_node2.first);      
-      for (unsigned int i=0; i<esup_node1.first; ++i)
+      std::vector<unsigned int> cell_node2(esup_node2.first);
+      for(unsigned int i=0; i<esup_node1.first; ++i)
          cell_node1[i] = esup_node1.second[i];
-      for (unsigned int i=0; i<esup_node2.first; ++i)
+      for(unsigned int i=0; i<esup_node2.first; ++i)
          cell_node2[i] = esup_node2.second[i];
-      
-      //Sort the arrays, needed for intersection
+
+      // Sort the arrays, needed for intersection
       std::sort(cell_node1.begin(), cell_node1.end());
       std::sort(cell_node2.begin(), cell_node2.end());
 
-      //Find the intersection
+      // Find the intersection
       std::vector<unsigned int> inter(std::min(esup_node1.first, esup_node2.first));
       std::set_intersection(cell_node1.begin(), cell_node1.end(),
                             cell_node2.begin(), cell_node2.end(), inter.begin());
-      
-      //get the nodes of the first cell (to check the orientation)
-      auto cell = get_cell_vertices(inter[0]);  
+
+      // get the nodes of the first cell (to check the orientation)
+      auto cell = get_cell_vertices(inter[0]);
       auto a = get_coord(node1);
       auto b = get_coord(node2);
-      const double *c = 0;
-      //loop over the nodes of the element and get node c (other than a and b)
-      for (unsigned int inode=0; inode<cell.first; ++inode) 
+      const double* c = 0;
+      // loop over the nodes of the element and get node c (other than a and b)
+      for(unsigned int inode=0; inode<cell.first; ++inode)
       {
-         if (cell.second[inode] != node1 && cell.second[inode] != node2)  
+         if(cell.second[inode] != node1 && cell.second[inode] != node2)
          {
             c = get_coord(cell.second[inode]);
             break;
          }
       }
-      if (orient(a, b, c) == 1) //c is to the left of ab
+      if(orient(a, b, c) == 1)  // c is to the left of ab
       {
          iface_cell[2*jface] = inter[0];
          iface_cell[2*jface+1] = inter[1];
       }
-      else  //c is to the right
+      else  // c is to the right
       {
          iface_cell[2*jface] = inter[1];
          iface_cell[2*jface+1] = inter[0];
@@ -498,91 +498,91 @@ void Grid::construct_esuf()
    }
 
    //Boundary Faces
-   bface_cell = new unsigned int[n_bface];   //only 1 neighbouring cell
-   for (unsigned int jface=0; jface<n_bface; ++jface) //loop over all the faces
+   bface_cell = new unsigned int[n_bface];   // only 1 neighbouring cell
+   for(unsigned int jface=0; jface<n_bface; ++jface)  // loop over all the faces
    {
-      auto bf = get_bface_vertices(jface);   //get the nodes for jface
+      auto bf = get_bface_vertices(jface);   // get the nodes for jface
       unsigned int node1 = bf[0];
       unsigned int node2 = bf[1];
-      
-      auto esup_node1 = get_esup(node1);  //get elements surrounding node1
-      auto esup_node2 = get_esup(node2);  //get elements surrounding node2
+
+      auto esup_node1 = get_esup(node1);  // get elements surrounding node1
+      auto esup_node2 = get_esup(node2);  // get elements surrounding node2
       std::vector<unsigned int> cell_node1(esup_node1.first);
-      std::vector<unsigned int> cell_node2(esup_node2.first);      
-      for (unsigned int i=0; i<esup_node1.first; ++i)
+      std::vector<unsigned int> cell_node2(esup_node2.first);
+      for(unsigned int i=0; i<esup_node1.first; ++i)
          cell_node1[i] = esup_node1.second[i];
-      for (unsigned int i=0; i<esup_node2.first; ++i)
+      for(unsigned int i=0; i<esup_node2.first; ++i)
          cell_node2[i] = esup_node2.second[i];
-      
-      //Sort the arrays, needed for intersection
+
+      // Sort the arrays, needed for intersection
       std::sort(cell_node1.begin(), cell_node1.end());
       std::sort(cell_node2.begin(), cell_node2.end());
 
-      //find the intersection
+      // find the intersection
       std::vector<unsigned int> inter(std::min(esup_node1.first, esup_node2.first));
       std::set_intersection(cell_node1.begin(), cell_node1.end(),
                             cell_node2.begin(), cell_node2.end(), inter.begin());
 
       bface_cell[jface] = inter[0];
-       //get the nodes of the first cell (to check the orientation)
-      auto cell = get_cell_vertices(inter[0]); 
+      // get the nodes of the first cell (to check the orientation)
+      auto cell = get_cell_vertices(inter[0]);
       auto a = get_coord(node1);
       auto b = get_coord(node2);
-      const double *c = 0;
-      //loop over the nodes of the element and get node c (other than a and b)
-      for (unsigned int inode=0; inode<cell.first; ++inode) 
+      const double* c = 0;
+      // loop over the nodes of the element and get node c (other than a and b)
+      for(unsigned int inode=0; inode<cell.first; ++inode)
       {
-         if (cell.second[inode] != node1 && cell.second[inode] != node2)  
+         if(cell.second[inode] != node1 && cell.second[inode] != node2)
          {
             c = get_coord(cell.second[inode]);
             break;
          }
       }
-      if (orient(a, b, c) == 0) //c is to the right of ab
+      if(orient(a, b, c) == 0)  // c is to the right of ab
       {
-         //change the face direction so that the boundary cell is on the left
-         std::swap(bface[2*jface], bface[2*jface+1]); 
+         // change the face direction so that the boundary cell is on the left
+         std::swap(bface[2*jface], bface[2*jface+1]);
       }
    }
-   
-   has_esuf = true; 
+
+   has_esuf = true;
    cout << "Done\n";
 }
 
-//Find cells surrounding a cell 
-//type = 0 => face connected neighbours only, 1 => all neighbours including the node connected ones
+// Find cells surrounding a cell
+// type = 0 => face connected neighbours only, 1 => all neighbours including the node connected ones
 void Grid::construct_esue(const bool type)
 {
-   if (has_esue) return;
-   if (type == 1) //Moore neighbours
+   if(has_esue) return;
+   if(type == 1)  // Moore neighbours
       construct_esup();
-   else  //Von-Neumann neighbours
+   else  // Von-Neumann neighbours
       construct_esuf();
    std::cout << "Constructing elements surrounding element ... ";
 
    esue2 = new unsigned int[n_cell+1];
    //Initialize esue2
-   for (unsigned int i=0; i<=n_cell; ++i)
+   for(unsigned int i=0; i<=n_cell; ++i)
       esue2[i] = 0;
 
-   if (type == 1) //Moore neighbours (we construct this similar to psup)
-   { 
-      unsigned int *lelem = new unsigned int[n_cell]; //help array to avoid duplication
-      for (unsigned int i=0; i<n_cell; ++i)
-         lelem[i] = 0;  //Initialize lelem
+   if(type == 1)  // Moore neighbours (we construct this similar to psup)
+   {
+      unsigned int* lelem = new unsigned int[n_cell]; // help array to avoid duplication
+      for(unsigned int i=0; i<n_cell; ++i)
+         lelem[i] = 0;  // Initialize lelem
 
       unsigned int istor = 0;
-      std::vector<unsigned int> esue1_temp(0);  //temporary vector to enable resize function
-      for (unsigned int icell=0; icell<n_cell; ++icell)  //loop over all the cells
+      std::vector<unsigned int> esue1_temp(0);  // temporary vector to enable resize function
+      for(unsigned int icell=0; icell<n_cell; ++icell)   // loop over all the cells
       {
          auto cell = get_cell_vertices(icell);
-         for (unsigned int inode=0; inode<cell.first; ++inode) //loop over the nodes of icell
+         for(unsigned int inode=0; inode<cell.first; ++inode)  //loop over the nodes of icell
          {
-            auto esup = get_esup(cell.second[inode]);  //get the cells surrounding inode
-            for (unsigned int jcell=0; jcell<esup.first; ++jcell) //loop over the cell surrounding inode
+            auto esup = get_esup(cell.second[inode]);  // get the cells surrounding inode
+            for(unsigned int jcell=0; jcell<esup.first; ++jcell)  //loop over the cell surrounding inode
             {
-               //check if not already stored (similar to what we have done for psup)
-               if (esup.second[jcell] != icell && lelem[esup.second[jcell]] != icell+1)  
+               // check if not already stored (similar to what we have done for psup)
+               if(esup.second[jcell] != icell && lelem[esup.second[jcell]] != icell+1)
                {
                   esue1_temp.resize(esue1_temp.size()+1);
                   esue1_temp[istor] = esup.second[jcell];
@@ -593,49 +593,47 @@ void Grid::construct_esue(const bool type)
          }
          esue2[icell+1] = istor;
       }
-      //Copy the data from esue1_temp to esue1
+      // Copy the data from esue1_temp to esue1
       esue1 = new unsigned int[esue2[n_cell]];
-      for (unsigned int i=0; i<esue2[n_cell]; ++i)
+      for(unsigned int i=0; i<esue2[n_cell]; ++i)
          esue1[i] = esue1_temp[i];
 
       esue1_temp.resize(0);
       delete [] lelem;
-      has_esue = true;   
-      std::cout << "Done\n";
    }
-   
-   else  //Von-Neumann neighbours (we construct this similar to esup)
+
+   else  // Von-Neumann neighbours (we construct this similar to esup)
    {
-      //construct esue2
-      for (unsigned int iface=0; iface<n_iface; ++iface) //loop over all the faces
+      // construct esue2
+      for(unsigned int iface=0; iface<n_iface; ++iface)  // loop over all the faces
       {
-         auto face_cell = get_iface_cell(iface); //get the face neighbours
-         ++esue2[face_cell[0]+1];  //add one neighbour to left cell
-         ++esue2[face_cell[1]+1];  //add one neighbour to right cell
+         auto face_cell = get_iface_cell(iface); // get the face neighbours
+         ++esue2[face_cell[0]+1];  // add one neighbour to left cell
+         ++esue2[face_cell[1]+1];  // add one neighbour to right cell
       }
 
-      for (unsigned int i=1; i<=n_cell; ++i)
+      for(unsigned int i=1; i<=n_cell; ++i)
       {
          esue2[i] += esue2[i-1];
       }
       //construct esue1
       esue1 = new unsigned int[esue2[n_cell]];
-      for (unsigned int iface=0; iface<n_iface; ++iface)
+      for(unsigned int iface=0; iface<n_iface; ++iface)
       {
-         auto face_cell = get_iface_cell(iface);   //get the face neighbours
-         unsigned int istor1 = esue2[face_cell[0]];   //left cell
-         unsigned int istor2 = esue2[face_cell[1]];   //right cell
-         esue1[istor1] = face_cell[1]; //store right cell as a neighbour of left cell
-         esue1[istor2] = face_cell[0]; //store left cell as a neighbour of right cell
+         auto face_cell = get_iface_cell(iface);      // get the face neighbours
+         unsigned int istor1 = esue2[face_cell[0]];   // left cell
+         unsigned int istor2 = esue2[face_cell[1]];   // right cell
+         esue1[istor1] = face_cell[1]; // store right cell as a neighbour of left cell
+         esue1[istor2] = face_cell[0]; // store left cell as a neighbour of right cell
          ++esue2[face_cell[0]];
          ++esue2[face_cell[1]];
       }
       //reshuffle esue2
-      for (unsigned int i=n_cell; i>0; --i)
+      for(unsigned int i=n_cell; i>0; --i)
          esue2[i] = esue2[i-1];
       esue2[0] = 0;
+   }
 
-      has_esue = true;   
-      std::cout << "Done\n";
-   }   
+   has_esue = true;
+   std::cout << "Done\n";
 }
