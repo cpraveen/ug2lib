@@ -1,0 +1,23 @@
+# astyle indentation style
+
+--style=bsd
+
+--convert-tabs
+--indent-preprocessor
+--indent=spaces=3
+--indent-namespaces
+--min-conditional-indent=0
+
+# Use this to put space between "for" and "("
+#--pad-header
+
+# remove spaces like this "sin ( x )" to "sin(x)"
+--unpad-paren
+
+# write things as 'char *p'
+--align-pointer=type
+--align-reference=type
+
+--max-instatement-indent=60
+--suffix=none
+--quiet
