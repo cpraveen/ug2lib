@@ -7,4 +7,7 @@ int main()
    grid.write_vtk("cylinder.vtk");
    grid.construct_esup();
    grid.construct_psup();
+   grid.construct_iface();
+   grid.construct_esuf();
+   grid.construct_esue();
 }

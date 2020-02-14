@@ -14,6 +14,9 @@ public:
    void write_vtk(const string grid_file);
    void construct_esup();
    void construct_psup(const bool all_points=true);
+   void construct_iface();
+   void construct_esuf();
+   void construct_esue(const bool type=0);
    void compute_carea();
 
    inline unsigned int get_n_vertex()
@@ -39,6 +42,11 @@ public:
    inline unsigned int get_n_bface()
    {
       return n_bface;
+   }
+
+   inline unsigned int get_n_iface()
+   {
+      return n_iface;
    }
 
    inline const double* get_coord(unsigned int i)
@@ -72,6 +80,11 @@ public:
       return &bface_norm[i*dim];
    }
 
+   inline const unsigned int* get_bface_vertices(unsigned int i)
+   {
+      return &bface[2*i];
+   }
+
    inline std::pair<unsigned int,const unsigned int*> get_cell_vertices(unsigned int i)
    {
       unsigned int start = cell2[i];
@@ -93,9 +106,26 @@ public:
       return std::make_pair(end-start,&psup1[start]);
    }
 
+   inline std::pair<unsigned int,const unsigned int*> get_esue(unsigned int i)
+   {
+      unsigned int start = esue2[i];
+      unsigned int end = esue2[i+1];
+      return std::make_pair(end-start,&esue1[start]);
+   }
+
+   inline const unsigned int* get_iface_cell(unsigned int i)
+   {
+      return &iface_cell[2*i];
+   }
+
+   inline unsigned int get_bface_cell(unsigned int i)
+   {
+      return bface_cell[i];
+   }
+
 private:
    const int    dim = 2;
-   unsigned int n_vertex, n_cell, n_tri, n_quad, n_bface;
+   unsigned int n_vertex, n_cell, n_tri, n_quad, n_bface, n_iface;
    double       *coord;
 
    // cell data
@@ -106,6 +136,7 @@ private:
    // connectivity information
    unsigned int *esup1, *esup2;
    unsigned int *psup1, *psup2;
+   unsigned int *esue1, *esue2;
 
    // boundary face data
    unsigned int *bface;      // vertices forming the face
@@ -122,4 +153,16 @@ private:
 
    bool         has_esup;
    bool         has_psup;
+   bool         has_iface;
+   bool         has_esuf;
+   bool         has_esue;
 };
+
+//Calculates the cross product (ca x cb)
+inline bool orient(const double *a, const double *b, const double *c)
+{
+   double ar = (a[0]-c[0])*(b[1]-c[1]) - (b[0]-c[0])*(a[1]-c[1]);
+   if (ar<0) return 0;  //c is to the right of ab vector
+   else return 1;  //c is to the left of ab vector
+}
+
