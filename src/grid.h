@@ -143,7 +143,7 @@ public:
       return &iface_cell[2*i];
    }
 
-   inline unsigned int get_bface_cell(unsigned int i)
+   inline const unsigned int& get_bface_cell(unsigned int i)
    {
       return bface_cell[i];
    }

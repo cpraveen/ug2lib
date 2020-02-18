@@ -20,7 +20,7 @@ Grid::Grid()
    has_esue = false;
 }
 
-// desrructor
+// destructor
 Grid::~Grid()
 {
    if(!coord) delete [] coord;
@@ -448,12 +448,12 @@ void Grid::construct_esuf()
 
    //Interior Faces
    iface_cell = new unsigned int[2*n_iface];
-   for(unsigned int jface=0; jface<n_iface; ++jface)    //loop over all the faces
+   for(unsigned int jface=0; jface<n_iface; ++jface) // loop over all the faces
    {
       auto nface = get_iface_vertices(jface); // get the nodes for the face
-      unsigned int node1 = nface[0];
-      unsigned int node2 = nface[1];
-      auto esup_node1 = get_esup(node1);  //g et elements surrounding node1
+      const unsigned int node1 = nface[0];
+      const unsigned int node2 = nface[1];
+      auto esup_node1 = get_esup(node1);  // get elements surrounding node1
       auto esup_node2 = get_esup(node2);  // get elements surrounding node2
       std::vector<unsigned int> cell_node1(esup_node1.first);
       std::vector<unsigned int> cell_node2(esup_node2.first);
@@ -490,7 +490,7 @@ void Grid::construct_esuf()
          iface_cell[2*jface] = inter[0];
          iface_cell[2*jface+1] = inter[1];
       }
-      else  // c is to the right
+      else  // c is to the right of ab
       {
          iface_cell[2*jface] = inter[1];
          iface_cell[2*jface+1] = inter[0];
@@ -502,8 +502,8 @@ void Grid::construct_esuf()
    for(unsigned int jface=0; jface<n_bface; ++jface)  // loop over all the faces
    {
       auto bf = get_bface_vertices(jface);   // get the nodes for jface
-      unsigned int node1 = bf[0];
-      unsigned int node2 = bf[1];
+      const unsigned int node1 = bf[0];
+      const unsigned int node2 = bf[1];
 
       auto esup_node1 = get_esup(node1);  // get elements surrounding node1
       auto esup_node2 = get_esup(node2);  // get elements surrounding node2
@@ -561,7 +561,7 @@ void Grid::construct_esue(const esue_type type)
    std::cout << "Constructing elements surrounding element ... ";
 
    esue2 = new unsigned int[n_cell+1];
-   //Initialize esue2
+   // Initialize esue2
    for(unsigned int i=0; i<=n_cell; ++i)
       esue2[i] = 0;
 
@@ -628,7 +628,7 @@ void Grid::construct_esue(const esue_type type)
          ++esue2[face_cell[0]];
          ++esue2[face_cell[1]];
       }
-      //reshuffle esue2
+      // reshuffle esue2
       for(unsigned int i=n_cell; i>0; --i)
          esue2[i] = esue2[i-1];
       esue2[0] = 0;
@@ -638,7 +638,7 @@ void Grid::construct_esue(const esue_type type)
    std::cout << "Done\n";
 }
 
-//Compute the area of all cells
+// Compute the area of all cells
 void Grid::compute_cell_area()
 {
    carea = new double[n_cell];
@@ -646,18 +646,18 @@ void Grid::compute_cell_area()
    {
       double area = 0;
       auto cell = get_cell_vertices(icell);
-      auto p_n = get_coord(cell.second[cell.first-1]); //get the coordinates of the last point
+      auto p_n = get_coord(cell.second[cell.first-1]); // get coordinates of last point
       for(unsigned int ipoint=0; ipoint<cell.first-1; ++ipoint)
       {
-         auto p_i = get_coord(cell.second[ipoint]);   //get coordinates of ipoint
-         auto p_i_1 = get_coord(cell.second[ipoint+1]);  //get coordinates of next ipoint
+         auto p_i = get_coord(cell.second[ipoint]);   // get coordinates of ipoint
+         auto p_i_1 = get_coord(cell.second[ipoint+1]);  // get coordinates of next ipoint
          area += 0.5*((p_i[0]-p_n[0])*(p_i_1[1]-p_n[1])-(p_i[1]-p_n[1])*(p_i_1[0]-p_n[0]));
       }
       carea[icell] = std::abs(area);
    }
 }
 
-//Compute the unit normal and the length for all faces
+// Compute the unit normal and the length for all faces
 void Grid::compute_face_normal()
 {
    //Interior faces
@@ -665,9 +665,9 @@ void Grid::compute_face_normal()
    iface_len = new double[n_iface];
    for(unsigned int iface=0; iface<get_n_iface(); ++iface)
    {
-      auto face = get_iface_vertices(iface); //get the nodes of iface
-      auto node1 = get_coord(face[0]); //coordinates of first node
-      auto node2 = get_coord(face[1]); //coordinates of second node
+      auto face = get_iface_vertices(iface); // get the nodes of iface
+      auto node1 = get_coord(face[0]); // coordinates of first node
+      auto node2 = get_coord(face[1]); // coordinates of second node
       //calculate length of the face
       iface_len[iface] = std::sqrt((node2[1]-node1[1])*(node2[1]-node1[1])
                                    + (node2[0]-node1[0])*(node2[0]-node1[0]));
@@ -675,15 +675,15 @@ void Grid::compute_face_normal()
       iface_norm[2*iface+1] = (node1[0]-node2[0])/iface_len[iface];
    }
 
-   //Boundary faces
+   // Boundary faces
    bface_norm = new double[2*n_bface];
    bface_len =new double[n_bface];
    for(unsigned int bface=0; bface<get_n_bface(); ++bface)
    {
-      auto face = get_bface_vertices(bface); //get the nodes of bface
-      auto node1 = get_coord(face[0]); //coordinates of first node
-      auto node2 = get_coord(face[1]); //coordinates of second node
-      //calculate length of the face
+      auto face = get_bface_vertices(bface); // get the nodes of bface
+      auto node1 = get_coord(face[0]); // coordinates of first node
+      auto node2 = get_coord(face[1]); // coordinates of second node
+      // calculate length of the face
       bface_len[bface] = std::sqrt((node2[1]-node1[1])*(node2[1]-node1[1])
                                    + (node2[0]-node1[0])*(node2[0]-node1[0]));
       bface_norm[2*bface] = (node2[1]-node1[1])/bface_len[bface];
@@ -691,7 +691,7 @@ void Grid::compute_face_normal()
    }
 }
 
-//Compute cell centroid
+// Compute cell centroid
 void Grid::compute_cell_centroid()
 {
    cell_centroid = new double[2*n_cell];
@@ -699,11 +699,11 @@ void Grid::compute_cell_centroid()
    {
       double x_centroid = 0;
       double y_centroid = 0;
-      auto cell = get_cell_vertices(icell);  //get the nodes of the cell
+      auto cell = get_cell_vertices(icell);  // get the nodes of the cell
       for(unsigned int inode=0; inode<cell.first; ++inode) //loop over the nodes of the cell
       {
-         auto node = get_coord(cell.second[inode]);   //get the node coordinates
-         //calculate the centroid
+         auto node = get_coord(cell.second[inode]);   // get the node coordinates
+         // calculate the centroid
          x_centroid += node[0];
          y_centroid += node[1];
       }
@@ -712,33 +712,33 @@ void Grid::compute_cell_centroid()
    }
 }
 
-//Compute face centroid
+// Compute face centroid
 void Grid::compute_face_centroid()
 {
-   //Interior faces
+   // Interior faces
    iface_centroid = new double[2*n_iface];
    for(unsigned int iface=0; iface<n_iface; ++iface)
    {
-      auto face = get_iface_vertices(iface); //get the nodes of iface
-      auto node1 = get_coord(face[0]); //coordinates of node1
-      auto node2 = get_coord(face[1]); //coordinates of node2
+      auto face = get_iface_vertices(iface); // get the nodes of iface
+      auto node1 = get_coord(face[0]); // coordinates of node1
+      auto node2 = get_coord(face[1]); // coordinates of node2
       iface_centroid[2*iface] = 0.5*(node1[0]+node2[0]);
       iface_centroid[2*iface+1] = 0.5*(node1[1]+node2[1]);
    }
 
-   //Boundary faces
+   // Boundary faces
    bface_centroid = new double[2*n_bface];
    for(unsigned int bface=0; bface<n_bface; ++bface)
    {
-      auto face = get_bface_vertices(bface); //get the nodes of bface
-      auto node1 = get_coord(face[0]); //coordinates of node1
-      auto node2 = get_coord(face[1]); //coordinates of node2
+      auto face = get_bface_vertices(bface); // get the nodes of bface
+      auto node1 = get_coord(face[0]); // coordinates of node1
+      auto node2 = get_coord(face[1]); // coordinates of node2
       bface_centroid[2*bface] = 0.5*(node1[0]+node2[0]);
       bface_centroid[2*bface+1] = 0.5*(node1[1]+node2[1]);
    }
 }
 
-//Function to dump all the constructed data from reference mesh
+// Function to dump all the constructed data from reference mesh
 void grid_test1()
 {
    //Read the reference mesh file ("test1.msh")
@@ -749,10 +749,10 @@ void grid_test1()
    grid.construct_esuf();
    grid.construct_esue(grid.esue_neumann);
 
-   //Write the reference data to test1.dat
+   // Write the reference data to test1.dat
    std::cout << "Writing to test1.dat ... ";
    std::ofstream file("test1.dat");
-   unsigned int n_bface = grid.get_n_bface()+1;  //to sync the cell numbering with gmsh numbering
+   unsigned int n_bface = grid.get_n_bface()+1; // to sync cell numbering with gmsh numbering
    // Interior Faces
    file << "// Interior Faces\n";
    for(unsigned int iface=0; iface<grid.get_n_iface(); ++iface)
