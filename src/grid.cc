@@ -14,7 +14,8 @@ using namespace std;
 Grid::Grid()
 {
    has_esup = false;
-   has_psup = false;
+   has_psup_all = false;
+   has_psup_edge = false;
    has_iface = false;
    has_esuf = false;
    has_esue_moore = false;
@@ -314,11 +315,21 @@ void Grid::construct_esup()
 
 // Find points surrounding a point
 // If all_points==false, find only points connected by an edge.
-void Grid::construct_psup(const bool all_points)
+void Grid::construct_psup(const psup_type type)
 {
-   if(has_psup) return;
+   if(type == psup_all && has_psup_all) return;
+   if(type == psup_edge && has_psup_edge) return;
    construct_esup(); // psup needs esup data
-   cout << "Constructing points surrounding point ... ";
+
+   // Different type of psup requested
+   // Delete existing memory
+   if (!psup1) delete[] psup1;
+   if (!psup2) delete[] psup2;
+
+   if(type == psup_all)
+      cout << "Constructing points surrounding point: all ... ";
+   else
+      cout << "Constructing points surrounding point: edge ... ";
 
    psup2 = new unsigned int[n_vertex+1];
    unsigned int* lpoin = new unsigned int[n_vertex]; // Help array to avoid duplication from neighbouring cells
@@ -344,7 +355,7 @@ void Grid::construct_psup(const bool all_points)
             unsigned int gnode = cell.second[jpoint];  // global node number
             if(gnode != ipoint && lpoin[gnode] != ipoint+1) // check for duplication
             {
-               if(all_points == true) // get all the points surrounding the node
+               if(type == psup_all) // get all the points surrounding the node
                {
                   psup1_temp.resize(psup1_temp.size()+1);
                   psup1_temp[istor] = gnode;
@@ -376,7 +387,8 @@ void Grid::construct_psup(const bool all_points)
 
    psup1_temp.resize(0);
    delete [] lpoin;
-   has_psup = true;
+   has_psup_all = (type == psup_all);
+   has_psup_edge = (type == psup_edge);
    cout << "Done\n";
 }
 
@@ -384,7 +396,7 @@ void Grid::construct_psup(const bool all_points)
 void Grid::construct_iface()
 {
    if(has_iface) return;
-   construct_psup(false); // construct psup data
+   construct_psup(psup_edge); // construct psup data
    cout << "Constructing faces ... ";
    n_iface = 0;
    std::vector<unsigned int> face_temp(0); // to enable resize function

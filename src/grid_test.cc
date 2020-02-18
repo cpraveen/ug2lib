@@ -9,7 +9,8 @@ void grid_test1()
 
    std::cout << "Constructing dump data ... \n";
    grid.construct_esuf();
-   grid.construct_esue(grid.esue_neumann);
+   grid.construct_psup(Grid::psup_all);
+   grid.construct_esue(Grid::esue_neumann);
 
    // Write the reference data to test1.dat
    std::cout << "Writing to test1.dat ... ";
@@ -46,7 +47,7 @@ void grid_test1()
       file << std::endl;
    }
 
-   // Points surrounding point (all_point = true)
+   // Points surrounding point
    file << "//Points surrounding point\n";
    for(unsigned int node=0; node<grid.get_n_vertex(); ++node)
    {

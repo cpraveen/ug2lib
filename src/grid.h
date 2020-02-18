@@ -26,14 +26,15 @@ const int Quadrilateral9 = 10;
 class Grid
 {
 public:
-   enum esue_type {esue_neumann, esue_moore};
+   enum esue_type {esue_neumann, esue_moore, esue_none};
+   enum psup_type {psup_all, psup_edge, psup_none};
 
    Grid();
    ~Grid();
    void read_gmsh(const string grid_file);
    void write_vtk(const string grid_file);
    void construct_esup();
-   void construct_psup(const bool all_points);
+   void construct_psup(const psup_type type);
    void construct_iface();
    void construct_esuf();
    void construct_esue(const esue_type type);
@@ -166,6 +167,20 @@ public:
       return bface_cell[i];
    }
 
+   inline esue_type get_esue_type()
+   {
+      if(has_esue_moore) return esue_moore;
+      if(has_esue_neumann) return esue_neumann;
+      return esue_none;
+   }
+
+   inline psup_type get_psup_type()
+   {
+      if(has_psup_all) return psup_all;
+      if(has_psup_edge) return psup_edge;
+      return psup_none;
+   }
+
 private:
    const int    dim = 2;
    unsigned int n_vertex, n_cell, n_tri, n_quad, n_bface, n_iface;
@@ -198,7 +213,8 @@ private:
    double*       iface_centroid; //centroid of iface
 
    bool         has_esup;
-   bool         has_psup;
+   bool         has_psup_all;
+   bool         has_psup_edge;
    bool         has_iface;
    bool         has_esuf;
    bool         has_esue_moore;
