@@ -17,7 +17,8 @@ Grid::Grid()
    has_psup = false;
    has_iface = false;
    has_esuf = false;
-   has_esue = false;
+   has_esue_moore = false;
+   has_esue_neumann = false;
 }
 
 // destructor
@@ -383,7 +384,7 @@ void Grid::construct_psup(const bool all_points)
 void Grid::construct_iface()
 {
    if(has_iface) return;
-   construct_psup(); // construct psup data
+   construct_psup(false); // construct psup data
    cout << "Constructing faces ... ";
    n_iface = 0;
    std::vector<unsigned int> face_temp(0); // to enable resize function
@@ -553,12 +554,25 @@ void Grid::construct_esuf()
 // type = 0 => face connected neighbours only, 1 => all neighbours including the node connected ones
 void Grid::construct_esue(const esue_type type)
 {
-   if(has_esue) return;
+   if(type == esue_neumann && has_esue_neumann) return;
+   if(type == esue_moore && has_esue_moore) return;
+
    if(type == esue_moore)  // Moore neighbours
+   {
       construct_esup();
+      std::cout << "Constructing cells surrounding cell: moore ... ";
+   }
    else if(type == esue_neumann)  // Von-Neumann neighbours
+   {
       construct_esuf();
-   std::cout << "Constructing elements surrounding element ... ";
+      std::cout << "Constructing cells surrounding cell: neumann ... ";
+   }
+
+   // Delete if memory is already allocated
+   // This is needed if e.g., we already have moore neighbours but now we 
+   // want neumann neighbours.
+   if (!esue1) delete[] esue1;
+   if (!esue2) delete[] esue2;
 
    esue2 = new unsigned int[n_cell+1];
    // Initialize esue2
@@ -600,8 +614,8 @@ void Grid::construct_esue(const esue_type type)
 
       esue1_temp.resize(0);
       delete [] lelem;
+      has_esue_moore = true;
    }
-
    else  // Von-Neumann neighbours (we construct this similar to esup)
    {
       // construct esue2
@@ -632,9 +646,9 @@ void Grid::construct_esue(const esue_type type)
       for(unsigned int i=n_cell; i>0; --i)
          esue2[i] = esue2[i-1];
       esue2[0] = 0;
+      has_esue_neumann = true;
    }
 
-   has_esue = true;
    std::cout << "Done\n";
 }
 

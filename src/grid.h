@@ -33,7 +33,7 @@ public:
    void read_gmsh(const string grid_file);
    void write_vtk(const string grid_file);
    void construct_esup();
-   void construct_psup(const bool all_points=true);
+   void construct_psup(const bool all_points);
    void construct_iface();
    void construct_esuf();
    void construct_esue(const esue_type type);
@@ -201,7 +201,8 @@ private:
    bool         has_psup;
    bool         has_iface;
    bool         has_esuf;
-   bool         has_esue;
+   bool         has_esue_moore;
+   bool         has_esue_neumann;
 };
 
 // Calculates the cross product (ca x cb)
