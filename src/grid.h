@@ -1,9 +1,27 @@
+#ifndef __GRID_H__
+#define __GRID_H__
+
 #include <iostream>
 #include <fstream>
 #include <vector>
 #include <utility> // std::pair, std::make_pair
 
 using namespace std;
+
+namespace Gmsh
+{
+
+// Gmsh element types
+// Linear elements
+const int Line2 = 1;
+const int Triangle3 = 2;
+const int Quadrilateral4 = 3;
+
+// Quadratic elements
+const int Line3 = 8;
+const int Triangle6 = 9;
+const int Quadrilateral9 = 10;
+}
 
 class Grid
 {
@@ -196,4 +214,6 @@ inline bool orient(const double* a, const double* b, const double* c)
       return 1;  // c is to the left of ab vector
 }
 
-void grid_test1(); //Function to dump the constructed data (for reference mesh)
+void grid_test1(); // Function to dump the constructed data (for reference mesh)
+
+#endif
