@@ -64,6 +64,11 @@ public:
       return carea[i];
    }
 
+   inline const double* get_cell_centroid(unsigned int i)
+   {
+      return &cell_centroid[2*i];
+   }
+
    // We are assuming linear edge
    inline const unsigned int* get_iface_vertices(unsigned int i)
    {
@@ -80,6 +85,16 @@ public:
       return &iface_norm[i*dim];
    }
 
+   inline const double* get_iface_centroid(unsigned int i)
+   {
+      return &iface_centroid[2*i];
+   }
+
+   inline const double* get_bface_centroid(unsigned int i)
+   {
+      return &bface_centroid[2*i];
+   }
+
    inline const double* get_bface_normal(unsigned int i)
    {
       return &bface_norm[i*dim];
@@ -88,6 +103,11 @@ public:
    inline const unsigned int* get_bface_vertices(unsigned int i)
    {
       return &bface[2*i];
+   }
+
+   inline const double& get_bface_length(unsigned int i)
+   {
+      return bface_len[i];
    }
 
    inline std::pair<unsigned int,const unsigned int*> get_cell_vertices(unsigned int i)
@@ -137,6 +157,7 @@ private:
    unsigned int* cell1, *cell2;
    int*          ctype;
    double*       carea;
+   double*       cell_centroid;  //centroid of the cells
 
    // connectivity information
    unsigned int* esup1, *esup2;
@@ -149,12 +170,14 @@ private:
    int*          bface_type; // type read from grid file, used for bc
    double*       bface_norm; // unit outward normal
    double*       bface_len;  // length of face
+   double*       bface_centroid; //centroid of bface
 
    // Interior faces
    double*       iface_len;  // length of face
    unsigned int* iface;      // vertex numbers for each face
    double*       iface_norm; // unit normal to face
    unsigned int* iface_cell; // cells adjacent to face
+   double*       iface_centroid; //centroid of iface
 
    bool         has_esup;
    bool         has_psup;
@@ -173,3 +196,4 @@ inline bool orient(const double* a, const double* b, const double* c)
       return 1;  // c is to the left of ab vector
 }
 
+void grid_test1(); //Function to dump the constructed data (for reference mesh)

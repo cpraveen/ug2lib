@@ -4,6 +4,7 @@
 #include <cassert>
 #include <utility> // std::pair, std::make_pair
 #include <algorithm>
+#include <cmath>
 
 #include "grid.h"
 
@@ -634,5 +635,177 @@ void Grid::construct_esue(const esue_type type)
    }
 
    has_esue = true;
+   std::cout << "Done\n";
+}
+
+//Compute the area of all cells
+void Grid::compute_cell_area()
+{
+   carea = new double[n_cell];
+   for(unsigned int icell=0; icell<n_cell; ++icell)
+   {
+      double area = 0;
+      auto cell = get_cell_vertices(icell);
+      auto p_n = get_coord(cell.second[cell.first-1]); //get the coordinates of the last point
+      for(unsigned int ipoint=0; ipoint<cell.first-1; ++ipoint)
+      {
+         auto p_i = get_coord(cell.second[ipoint]);   //get coordinates of ipoint
+         auto p_i_1 = get_coord(cell.second[ipoint+1]);  //get coordinates of next ipoint
+         area += 0.5*((p_i[0]-p_n[0])*(p_i_1[1]-p_n[1])-(p_i[1]-p_n[1])*(p_i_1[0]-p_n[0]));
+      }
+      carea[icell] = std::abs(area);
+   }
+}
+
+//Compute the unit normal and the length for all faces
+void Grid::compute_face_normal()
+{
+   //Interior faces
+   iface_norm = new double[2*n_iface];
+   iface_len = new double[n_iface];
+   for(unsigned int iface=0; iface<get_n_iface(); ++iface)
+   {
+      auto face = get_iface_vertices(iface); //get the nodes of iface
+      auto node1 = get_coord(face[0]); //coordinates of first node
+      auto node2 = get_coord(face[1]); //coordinates of second node
+      //calculate length of the face
+      iface_len[iface] = std::sqrt((node2[1]-node1[1])*(node2[1]-node1[1])
+                                   + (node2[0]-node1[0])*(node2[0]-node1[0]));
+      iface_norm[2*iface] = (node2[1]-node1[1])/iface_len[iface];
+      iface_norm[2*iface+1] = (node1[0]-node2[0])/iface_len[iface];
+   }
+
+   //Boundary faces
+   bface_norm = new double[2*n_bface];
+   bface_len =new double[n_bface];
+   for(unsigned int bface=0; bface<get_n_bface(); ++bface)
+   {
+      auto face = get_bface_vertices(bface); //get the nodes of bface
+      auto node1 = get_coord(face[0]); //coordinates of first node
+      auto node2 = get_coord(face[1]); //coordinates of second node
+      //calculate length of the face
+      bface_len[bface] = std::sqrt((node2[1]-node1[1])*(node2[1]-node1[1])
+                                   + (node2[0]-node1[0])*(node2[0]-node1[0]));
+      bface_norm[2*bface] = (node2[1]-node1[1])/bface_len[bface];
+      bface_norm[2*bface+1] = (node1[0]-node2[0])/bface_len[bface];
+   }
+}
+
+//Compute cell centroid
+void Grid::compute_cell_centroid()
+{
+   cell_centroid = new double[2*n_cell];
+   for(unsigned int icell=0; icell<n_cell; ++icell)
+   {
+      double x_centroid = 0;
+      double y_centroid = 0;
+      auto cell = get_cell_vertices(icell);  //get the nodes of the cell
+      for(unsigned int inode=0; inode<cell.first; ++inode) //loop over the nodes of the cell
+      {
+         auto node = get_coord(cell.second[inode]);   //get the node coordinates
+         //calculate the centroid
+         x_centroid += node[0];
+         y_centroid += node[1];
+      }
+      cell_centroid[2*icell] = x_centroid/cell.first;
+      cell_centroid[2*icell+1] = y_centroid/cell.first;
+   }
+}
+
+//Compute face centroid
+void Grid::compute_face_centroid()
+{
+   //Interior faces
+   iface_centroid = new double[2*n_iface];
+   for(unsigned int iface=0; iface<n_iface; ++iface)
+   {
+      auto face = get_iface_vertices(iface); //get the nodes of iface
+      auto node1 = get_coord(face[0]); //coordinates of node1
+      auto node2 = get_coord(face[1]); //coordinates of node2
+      iface_centroid[2*iface] = 0.5*(node1[0]+node2[0]);
+      iface_centroid[2*iface+1] = 0.5*(node1[1]+node2[1]);
+   }
+
+   //Boundary faces
+   bface_centroid = new double[2*n_bface];
+   for(unsigned int bface=0; bface<n_bface; ++bface)
+   {
+      auto face = get_bface_vertices(bface); //get the nodes of bface
+      auto node1 = get_coord(face[0]); //coordinates of node1
+      auto node2 = get_coord(face[1]); //coordinates of node2
+      bface_centroid[2*bface] = 0.5*(node1[0]+node2[0]);
+      bface_centroid[2*bface+1] = 0.5*(node1[1]+node2[1]);
+   }
+}
+
+//Function to dump all the constructed data from reference mesh
+void grid_test1()
+{
+   //Read the reference mesh file ("test1.msh")
+   Grid grid;
+   grid.read_gmsh("test1.msh");
+
+   std::cout << "Constructing dump data ... \n";
+   grid.construct_esuf();
+   grid.construct_esue(grid.esue_neumann);
+
+   //Write the reference data to test1.dat
+   std::cout << "Writing to test1.dat ... ";
+   std::ofstream file("test1.dat");
+   unsigned int n_bface = grid.get_n_bface()+1;  //to sync the cell numbering with gmsh numbering
+   // Interior Faces
+   file << "// Interior Faces\n";
+   for(unsigned int iface=0; iface<grid.get_n_iface(); ++iface)
+   {
+      auto face_nodes = grid.get_iface_vertices(iface);
+      auto face_nbr = grid.get_iface_cell(iface);
+      file << "Face no.: " << iface+1 << "; Nodes: " << face_nodes[0]+1 << ", " << face_nodes[1]+1
+           << "; left cell: " << face_nbr[0]+n_bface << ", right cell: " << face_nbr[1]+n_bface << std::endl;
+   }
+
+   // Boundary Faces
+   file << "//Boundary Faces\n";
+   for(unsigned int bface=0; bface<grid.get_n_bface(); ++bface)
+   {
+      auto face_nodes = grid.get_bface_vertices(bface);
+      auto face_nbr = grid.get_bface_cell(bface);
+      file << "Face no.: " << bface+1 << "; Nodes: " << face_nodes[0]+1 << ", " << face_nodes[1]+1
+           << "; left cell: " << face_nbr+n_bface << std::endl;
+   }
+
+   // Elements surrounding point
+   file << "//Elements surrounding point\n";
+   for(unsigned int node=0; node<grid.get_n_vertex(); ++node)
+   {
+      auto esup = grid.get_esup(node);
+      file << "Node: " << node+1 << "; Surrounding Element(s): ";
+      for(unsigned int elem=0; elem<esup.first; ++elem)
+         file << esup.second[elem]+n_bface << " ";
+      file << std::endl;
+   }
+
+   // Points surrounding point (all_point = true)
+   file << "//Points surrounding point\n";
+   for(unsigned int node=0; node<grid.get_n_vertex(); ++node)
+   {
+      auto psup = grid.get_psup(node);
+      file << "Node: " << node+1 << "; Surrounding Point(s): ";
+      for(unsigned int jnode=0; jnode<psup.first; ++jnode)
+         file << psup.second[jnode]+1 << " ";
+      file << std::endl;
+   }
+
+   // Elements surrounding element (Von-Neumann)
+   file << "//Elements surrounding element\n";
+   for(unsigned int ielem=0; ielem<grid.get_n_cell(); ++ielem)
+   {
+      auto esue = grid.get_esue(ielem);
+      file << "Cell no.: " << ielem+n_bface << "; Surrounding cell(s): ";
+      for(unsigned int jelem=0; jelem<esue.first; ++jelem)
+         file << esue.second[jelem]+n_bface << " ";
+      file << std::endl;
+   }
+
+   file.close();
    std::cout << "Done\n";
 }

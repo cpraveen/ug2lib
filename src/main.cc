@@ -10,4 +10,8 @@ int main()
    grid.construct_iface();
    grid.construct_esuf();
    grid.construct_esue(Grid::esue_neumann);
+   grid.compute_cell_area();
+   grid.compute_face_normal();
+   grid.compute_cell_centroid();
+   grid.compute_face_centroid();
 }
