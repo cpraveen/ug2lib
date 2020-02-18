@@ -13,14 +13,14 @@ namespace Gmsh
 
 // Gmsh element types
 // Linear elements
-const int Line2 = 1;
-const int Triangle3 = 2;
-const int Quadrilateral4 = 3;
+   const int Line2 = 1;
+   const int Triangle3 = 2;
+   const int Quadrilateral4 = 3;
 
 // Quadratic elements
-const int Line3 = 8;
-const int Triangle6 = 9;
-const int Quadrilateral9 = 10;
+   const int Line3 = 8;
+   const int Triangle6 = 9;
+   const int Quadrilateral9 = 10;
 }
 
 class Grid
@@ -182,8 +182,8 @@ public:
    }
 
 private:
-   const int    dim = 2;
-   unsigned int n_vertex, n_cell, n_tri, n_quad, n_bface, n_iface;
+   const int     dim = 2;
+   unsigned int  n_vertex, n_cell, n_tri, n_quad, n_bface, n_iface;
    double*       coord;
 
    // cell data

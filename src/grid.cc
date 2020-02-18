@@ -323,8 +323,8 @@ void Grid::construct_psup(const psup_type type)
 
    // Different type of psup requested
    // Delete existing memory
-   if (!psup1) delete[] psup1;
-   if (!psup2) delete[] psup2;
+   if(!psup1) delete[] psup1;
+   if(!psup2) delete[] psup2;
 
    if(type == psup_all)
       cout << "Constructing points surrounding point: all ... ";
@@ -581,10 +581,10 @@ void Grid::construct_esue(const esue_type type)
    }
 
    // Delete if memory is already allocated
-   // This is needed if e.g., we already have moore neighbours but now we 
+   // This is needed if e.g., we already have moore neighbours but now we
    // want neumann neighbours.
-   if (!esue1) delete[] esue1;
-   if (!esue2) delete[] esue2;
+   if(!esue1) delete[] esue1;
+   if(!esue2) delete[] esue2;
 
    esue2 = new unsigned int[n_cell+1];
    // Initialize esue2
