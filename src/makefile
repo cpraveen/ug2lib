@@ -4,19 +4,26 @@ GRID_SRC = grid.cc grid_test.cc
 GRID_INC = grid.h
 GRID_OBJ = $(patsubst %.cc,%.o,$(GRID_SRC))
 
-all: main
+all: main ccfv1
 
 grid.o: $(GRID_INC) grid.cc
 	$(CXX) $(CXXFLAGS) -c grid.cc
 
 grid_test.o: $(GRID_INC) grid_test.cc
 	$(CXX) $(CXXFLAGS) -c grid_test.cc
-
+#------------------------------------------------------------------------------
 main.o: $(GRID_INC) main.cc
 	$(CXX) $(CXXFLAGS) -c main.cc
 
 main: $(GRID_OBJ) main.o
 	$(CXX) -o main main.o $(GRID_OBJ)
+#------------------------------------------------------------------------------
+ccfv1.o: $(GRID_INC) ccfv1.cc
+	$(CXX) $(CXXFLAGS) -c ccfv1.cc
+
+ccfv1: $(GRID_OBJ) ccfv1.o
+	$(CXX) -o ccfv1 ccfv1.o $(GRID_OBJ)
+#------------------------------------------------------------------------------
 
 clean:
 	rm -rf *.o main
