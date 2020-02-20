@@ -215,12 +215,12 @@ void Grid::read_gmsh(const string grid_file)
 }
 
 // Write grid in vtk format
-void Grid::write_vtk(const string grid_file)
+// ofstream must be opened before calling this function.
+void Grid::write_vtk(std::ofstream& vtk)
 {
-   // Save vtk file
-   ofstream vtk;
-   vtk.open(grid_file);
+   assert(vtk.is_open());
 
+   // Save vtk file
    vtk << "# vtk DataFile Version 3.0" << endl;
    vtk << "Test file" << endl;
    vtk << "ASCII" << endl;
@@ -256,7 +256,16 @@ void Grid::write_vtk(const string grid_file)
    }
 
    vtk.close();
-   cout << "Wrote " << grid_file << endl;
+}
+
+// Write grid into file specifed by filename argument
+void Grid::write_vtk(const string filename)
+{
+   std::ofstream vtk;
+   vtk.open(filename);
+   write_vtk(vtk);
+   vtk.close();
+   cout << "Wrote " << filename << endl;
 }
 
 // Find cells surrounding a point

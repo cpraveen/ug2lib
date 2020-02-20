@@ -32,7 +32,8 @@ public:
    Grid();
    ~Grid();
    void read_gmsh(const string grid_file);
-   void write_vtk(const string grid_file);
+   void write_vtk(std::ofstream& vtk);
+   void write_vtk(const string filename);
    void construct_esup();
    void construct_psup(const psup_type type);
    void construct_iface();
