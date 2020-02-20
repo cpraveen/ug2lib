@@ -10,14 +10,13 @@ using namespace std;
 
 namespace Gmsh
 {
-
-// Gmsh element types
-// Linear elements
+   // Gmsh element types
+   // Linear elements
    const int Line2 = 1;
    const int Triangle3 = 2;
    const int Quadrilateral4 = 3;
 
-// Quadratic elements
+   // Quadratic elements
    const int Line3 = 8;
    const int Triangle6 = 9;
    const int Quadrilateral9 = 10;
@@ -79,6 +78,11 @@ public:
       return &coord[i*dim];
    }
 
+   inline int get_cell_type(unsigned int i)
+   {
+      return ctype[i];
+   }
+   
    inline const double& get_cell_area(unsigned int i)
    {
       return carea[i];

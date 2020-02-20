@@ -1,10 +1,13 @@
 #include "grid.h"
+#include "vtk_writer.h"
 
 int main()
 {
    Grid grid;
    grid.read_gmsh("cylinder.msh");
-   grid.write_vtk("cylinder.vtk");
+   VTKWriter writer("cylinder.vtk", grid);
+   writer.close();
+
    grid.construct_esup();
    grid.construct_psup(Grid::psup_edge);
    grid.construct_iface();
