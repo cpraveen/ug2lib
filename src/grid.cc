@@ -255,7 +255,8 @@ void Grid::write_vtk(std::ofstream& vtk)
       }
    }
 
-   vtk.close();
+   // NOTE: We dont close the ofstream because we assume it was opened
+   // when we enter this function.
 }
 
 // Write grid into file specifed by filename argument
