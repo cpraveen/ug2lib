@@ -185,12 +185,12 @@ int main()
 
    // Set initial condition
    set_initial_condition(grid, u);
-   save_solution(grid, u, 0.0, 0);
 
    double dt = compute_time_step(grid);
    double* R = new double[n_cell];
    double t = 0.0;
    unsigned int iter = 0;
+   save_solution(grid, u, t, iter);
    while(t < 2.0*M_PI)
    {
       compute_residual(grid, u, R);
