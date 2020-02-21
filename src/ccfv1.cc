@@ -37,30 +37,44 @@ double initial_condition(const double *x)
 double compute_time_step(Grid& grid)
 {
    auto n_cell = grid.get_n_cell();
-   vector<double> hmin(n_cell);
+   vector<double> tmp(n_cell);
    for(unsigned int i=0; i<n_cell; ++i)
-      hmin[i] = 1.0e20;
+      tmp[i] = 0.0;
 
    auto n_iface = grid.get_n_iface();
    for(unsigned int i=0; i<n_iface; ++i)
    {
-      auto cell = grid.get_iface_cell(i);
-      auto xl = grid.get_coord(cell[0]);
-      auto xr = grid.get_coord(cell[1]);
       auto xf = grid.get_iface_centroid(i);
-      auto hl = distance(xl, xf);
-      auto hr = distance(xr, xf);
-      hmin[cell[0]] = fmin(hmin[cell[0]], hl);
-      hmin[cell[1]] = fmin(hmin[cell[1]], hr);
+      double v[2];
+      advection_velocity(xf, v);
+      auto normal = grid.get_iface_normal(i);
+      auto vn = dot(v, normal);
+      auto ds = grid.get_iface_length(i);
+      auto cell = grid.get_iface_cell(i);
+      if(vn > 0)
+         tmp[cell[0]] += vn * ds;
+      else
+         tmp[cell[1]] -= vn * ds;
+   }
+
+   auto n_bface = grid.get_n_bface();
+   for(unsigned int i=0; i<n_bface; ++i)
+   {
+      auto xf = grid.get_bface_centroid(i);
+      double v[2];
+      advection_velocity(xf, v);
+      auto normal = grid.get_bface_normal(i);
+      auto vn = dot(v, normal);
+      auto ds = grid.get_bface_length(i);
+      auto cell = grid.get_bface_cell(i);
+      if(vn > 0) tmp[cell] += vn * ds;
    }
 
    double dt = 1.0e20;
    for(unsigned int i=0; i<n_cell; ++i)
    {
-      auto x = grid.get_cell_centroid(i);
-      double v[2];
-      advection_velocity(x, v);
-      dt = fmin(dt, hmin[i]/(norm(v)+1.0e-14));
+      auto area = grid.get_cell_area(i);
+      dt = fmin(dt, area/(tmp[i]+1.0e-14));
    }
    cout << "Time step = " << dt << endl;
    return dt;
@@ -173,7 +187,7 @@ int main()
    set_initial_condition(grid, u);
    save_solution(grid, u, 0.0, 0);
 
-   double dt = 0.40 * compute_time_step(grid);
+   double dt = compute_time_step(grid);
    double* R = new double[n_cell];
    double t = 0.0;
    unsigned int iter = 0;
