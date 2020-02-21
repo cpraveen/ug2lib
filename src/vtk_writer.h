@@ -6,7 +6,8 @@
 class VTKWriter
 {
 public:
-   VTKWriter(std::string filename, Grid& grid);
+   VTKWriter(std::string filename, Grid& grid,
+             double time=0.0, int cycle=0);
    ~VTKWriter();
 
    void write_cell_scalar(const double *data, std::string name);
@@ -17,6 +18,8 @@ private:
 
    std::string   filename;
    Grid*         grid;
+   double        time;
+   int           cycle;
    std::ofstream vtk;
 };
 #endif

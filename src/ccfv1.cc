@@ -133,7 +133,7 @@ void set_initial_condition(Grid& grid, double* u)
 }
 
 // save solution to file with different name
-void save_solution(Grid& grid, const double* u)
+void save_solution(Grid& grid, const double* u, double time, int iter)
 {
    static int counter = 0;
    string filename = "sol";
@@ -150,7 +150,7 @@ void save_solution(Grid& grid, const double* u)
    }
 
    filename += ".vtk";
-   VTKWriter writer(filename, grid);
+   VTKWriter writer(filename, grid, time, iter);
    writer.write_cell_scalar(u,"u");
    ++counter;
 }
@@ -171,7 +171,7 @@ int main()
 
    // Set initial condition
    set_initial_condition(grid, u);
-   save_solution(grid, u);
+   save_solution(grid, u, 0.0, 0);
 
    double dt = 0.40 * compute_time_step(grid);
    double* R = new double[n_cell];
@@ -183,6 +183,6 @@ int main()
       update_solution(grid, u, R, dt);
       t += dt; ++iter;
       cout << "iter, t = " << iter << " " << t << endl;
-      if(iter%100 == 0) save_solution(grid, u);
+      if(iter%100 == 0) save_solution(grid, u, t, iter);
    }
 }

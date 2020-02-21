@@ -3,10 +3,12 @@
 using namespace std;
 
 // constructor
-VTKWriter::VTKWriter(string filename, Grid& grid)
+VTKWriter::VTKWriter(string filename, Grid& grid, double time, int cycle)
 :
 filename (filename),
-grid (&grid)
+grid (&grid),
+time (time),
+cycle (cycle)
 {
    vtk.open(filename);
    assert(vtk.is_open());
@@ -31,6 +33,11 @@ void VTKWriter::write_grid()
    vtk << "Test file" << endl;
    vtk << "ASCII" << endl;
    vtk << "DATASET UNSTRUCTURED_GRID" << endl;
+   vtk << "FIELD FieldData 2" << endl;
+   vtk << "TIME 1 1 double" << endl;
+   vtk << time << endl;
+   vtk << "CYCLE 1 1 int" << endl;
+   vtk << cycle << endl;
    vtk << "POINTS  " << n_vertex << "  float" << endl;
 
    for(unsigned int i=0; i<n_vertex; ++i)
