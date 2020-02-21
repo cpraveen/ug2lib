@@ -6,8 +6,6 @@
 #include <vector>
 #include <utility> // std::pair, std::make_pair
 
-using namespace std;
-
 namespace Gmsh
 {
    // Gmsh element types
@@ -30,9 +28,9 @@ public:
 
    Grid();
    ~Grid();
-   void read_gmsh(const string grid_file);
+   void read_gmsh(const std::string grid_file);
    void write_vtk(std::ofstream& vtk);
-   void write_vtk(const string filename);
+   void write_vtk(const std::string filename);
    void construct_esup();
    void construct_psup(const psup_type type);
    void construct_iface();

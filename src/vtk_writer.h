@@ -6,16 +6,16 @@
 class VTKWriter
 {
 public:
-   VTKWriter(string filename, Grid& grid);
+   VTKWriter(std::string filename, Grid& grid);
    ~VTKWriter();
 
-   void write_cell_scalar(const double *data, string name);
+   void write_cell_scalar(const double *data, std::string name);
    void close();
 
 private:
    void write_grid();
 
-   string        filename;
+   std::string   filename;
    Grid*         grid;
    std::ofstream vtk;
 };

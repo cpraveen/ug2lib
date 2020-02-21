@@ -1,5 +1,7 @@
 #include "vtk_writer.h"
 
+using namespace std;
+
 // constructor
 VTKWriter::VTKWriter(string filename, Grid& grid)
 :
@@ -66,15 +68,15 @@ void VTKWriter::write_cell_scalar(const double *data, string name)
 {
    auto n_cell = grid->get_n_cell();
 
-   vtk << "CELL_DATA " << n_cell << std::endl;
+   vtk << "CELL_DATA " << n_cell << endl;
    vtk << "SCALARS " << name << " double 1\n";
    vtk << "LOOKUP_TABLE default\n";
    for (unsigned int i=0; i<n_cell; ++i)
-      vtk << data[i] << std::endl;
+      vtk << data[i] << endl;
 }
 
 void VTKWriter::close()
 {
    vtk.close();
-   std::cout << "Wrote file " << filename << std::endl;
+   cout << "Wrote file " << filename << endl;
 }
