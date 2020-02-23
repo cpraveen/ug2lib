@@ -7,33 +7,39 @@
 
 using namespace std;
 
+// return euclidean norm of 2d vector
 double norm(const double *a)
 {
    return sqrt(pow(a[0],2) + pow(a[1],2));
 }
 
+// return euclidean distance b/w 2d vectors
 double distance(const double *a, const double *b)
 {
    return sqrt(pow(a[0]-b[0],2) + pow(a[1]-b[1],2));
 }
 
+// return dot product of 2d vectors
 double dot(const double*a, const double* b)
 {
    return a[0]*b[0] + a[1]*b[1];
 }
 
+// advection velocity in linear advection problem
 void advection_velocity(const double *x, double *v)
 {
    v[0] =  x[1];
    v[1] = -x[0];
 }
 
+// initial condition as a function of x,y
 double initial_condition(const double *x)
 {
    double r2 = pow(x[0]-0.5,2) + pow(x[1],2);
    return exp(-50.0*r2);
 }
 
+// compute dt using cfl condition based on maximum principle
 double compute_time_step(Grid& grid)
 {
    auto n_cell = grid.get_n_cell();
@@ -80,6 +86,7 @@ double compute_time_step(Grid& grid)
    return dt;
 }
 
+// upwind flux
 double num_flux(const double ul, const double ur,
                 const double* v, const double* normal)
 {
@@ -87,6 +94,8 @@ double num_flux(const double ul, const double ur,
    return (vn > 0.0) ? (vn*ul) : (vn*ur);
 }
 
+// compute finite volume residual R in the semi-discrete equation
+// A*du/dt + R = 0, A = cell area
 void compute_residual(Grid& grid, const double* u, double* R)
 {
    auto n_cell = grid.get_n_cell();
@@ -110,7 +119,7 @@ void compute_residual(Grid& grid, const double* u, double* R)
       R[cell[1]] -= flux * ds;
    }
 
-   //boundary faces
+   // boundary faces
    auto n_bface = grid.get_n_bface();
    for(unsigned int i=0; i<n_bface; ++i)
    {
