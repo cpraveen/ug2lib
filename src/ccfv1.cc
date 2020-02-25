@@ -178,11 +178,27 @@ void save_solution(Grid& grid, const double* u, double time, int iter)
    ++counter;
 }
 
-int main()
+void compute_error(Grid& grid, const double* u,
+                   double &l1error, double &l2error)
 {
-   Grid grid;
-   grid.read_gmsh("ccfv1.msh");
+   l1error = l2error = 0.0;
+   double total_area = 0.0;
+   auto n_cell = grid.get_n_cell();
+   for(unsigned int i=0; i<n_cell; ++i)
+   {
+      auto x = grid.get_cell_centroid(i);
+      auto uexact = initial_condition(x);
+      auto area = grid.get_cell_area(i);
+      l1error += abs(uexact - u[i]) * area;
+      l2error += pow(uexact-u[i],2) * area;
+      total_area += area;
+   }
+   l1error /= total_area;
+   l2error = sqrt(l2error/total_area);
+}
 
+void run(Grid& grid, double& l1error, double& l2error)
+{
    grid.construct_esuf();
    grid.compute_cell_area();
    grid.compute_cell_centroid();
@@ -197,15 +213,27 @@ int main()
 
    double dt = compute_time_step(grid);
    double* R = new double[n_cell];
-   double t = 0.0;
+   double t = 0.0, Tf = 2.0*M_PI;
    unsigned int iter = 0;
    save_solution(grid, u, t, iter);
-   while(t < 2.0*M_PI)
+   while(t < Tf)
    {
+      if(t+dt > Tf) dt = Tf - t;
       compute_residual(grid, u, R);
       update_solution(grid, u, R, dt);
       t += dt; ++iter;
       cout << "iter, t = " << iter << " " << t << endl;
       if(iter%100 == 0) save_solution(grid, u, t, iter);
    }
+
+   compute_error(grid, u, l1error, l2error);
+}
+
+int main()
+{
+   Grid grid;
+   grid.read_gmsh("ccfv1.msh");
+   double l1error, l2error;
+   run(grid, l1error, l2error);
+   cout << "l1, l2 error norm = " << l1error << " " << l2error << endl;
 }
