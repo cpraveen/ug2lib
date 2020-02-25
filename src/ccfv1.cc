@@ -227,6 +227,8 @@ void run(Grid& grid, double& l1error, double& l2error)
    }
 
    compute_error(grid, u, l1error, l2error);
+   delete [] u;
+   delete [] R;
 }
 
 int main()
