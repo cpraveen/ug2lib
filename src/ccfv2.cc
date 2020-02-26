@@ -30,11 +30,18 @@ double initial_condition(const double *x)
    return exp(-50.0*r2);
 }
 
+struct Parameters
+{
+   string grid_file;
+   double tfinal;
+   int save_freq;
+};
+
 // class for finite volume method
 class FVM
 {
 public:
-   FVM();
+   FVM(Parameters &param);
    ~FVM();
    void run();
 
@@ -48,6 +55,7 @@ private:
    void update_solution();
    void save_solution();
 
+   Parameters*  param;
    Grid         grid;
    double*      uold; // solution at time level n
    double*      u;    // solution at time level n+1
@@ -58,6 +66,13 @@ private:
    double       t, dt;
    unsigned int iter;
 };
+
+// constructor
+FVM::FVM(Parameters& param)
+:
+param (&param)
+{
+}
 
 void FVM::allocate_memory()
 {
@@ -82,8 +97,16 @@ void FVM::run()
 {
 }
 
-int main()
+void read_parameters(Parameters& param, char* param_file)
 {
-   FVM fvm;
+
+}
+
+int main(int argc, char* argv[])
+{
+   assert(argc == 2);
+   Parameters param;
+   read_parameters(param, argv[1]);
+   FVM fvm(param);
    fvm.run();
 }
