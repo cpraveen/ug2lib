@@ -10,32 +10,32 @@
 using namespace std;
 
 // return euclidean norm of 2d vector
-double norm(const double *a)
+double norm(const double* a)
 {
    return sqrt(pow(a[0],2) + pow(a[1],2));
 }
 
 // return euclidean distance b/w 2d vectors
-double distance(const double *a, const double *b)
+double distance(const double* a, const double* b)
 {
    return sqrt(pow(a[0]-b[0],2) + pow(a[1]-b[1],2));
 }
 
 // return dot product of 2d vectors
-double dot(const double*a, const double* b)
+double dot(const double* a, const double* b)
 {
    return a[0]*b[0] + a[1]*b[1];
 }
 
 // advection velocity in linear advection problem
-void advection_velocity(const double *x, double *v)
+void advection_velocity(const double* x, double* v)
 {
    v[0] =  x[1];
    v[1] = -x[0];
 }
 
 // initial condition as a function of x,y
-double initial_condition(const double *x)
+double initial_condition(const double* x)
 {
    double r2 = pow(x[0]-0.5,2) + pow(x[1],2);
    return exp(-50.0*r2);
@@ -60,7 +60,7 @@ struct Parameters
 class FVM
 {
 public:
-   FVM(Parameters &param);
+   FVM(Parameters& param);
    ~FVM();
    void run();
 
@@ -88,9 +88,11 @@ private:
 
 // constructor
 FVM::FVM(Parameters& param)
-:
-param (&param)
+   :
+   param(&param)
 {
+   t = 0.0;
+   iter = 0;
 }
 
 // destructor
@@ -120,16 +122,16 @@ void FVM::allocate_memory()
    uold = new double[n_cell];
    res = new double[n_cell];
    du = new double[2*n_cell];
-/*
-   // TODO: count memory needed for storing least squares coefficients
-   unsigned int c = 0;
-   for(unsigned int i=0; i<n_cell; ++i)
-   {
-      auto cell = grid.get_esue(i);
-      c += cell.first;
-   }
-   lscoef = new double[2*c];
-*/
+   /*
+      // TODO: count memory needed for storing least squares coefficients
+      unsigned int c = 0;
+      for(unsigned int i=0; i<n_cell; ++i)
+      {
+         auto cell = grid.get_esue(i);
+         c += cell.first;
+      }
+      lscoef = new double[2*c];
+   */
 }
 
 // set initial condition into solution array
@@ -216,8 +218,10 @@ void FVM::compute_residual()
       auto xl = grid.get_cell_centroid(cell[0]); // centroid of left cell
       auto xr = grid.get_cell_centroid(cell[1]); // right cell
       double rl[2], rr[2]; // vector from cell to face centroid
-      rl[0] = xf[0] - xl[0]; rl[1] = xf[1] - xl[1];
-      rr[0] = xf[0] - xr[0]; rr[1] = xf[1] - xr[1];
+      rl[0] = xf[0] - xl[0];
+      rl[1] = xf[1] - xl[1];
+      rr[0] = xf[0] - xr[0];
+      rr[1] = xf[1] - xr[1];
       auto ul = u[cell[0]] + dot(&du[2*cell[0]], rl);
       auto ur = u[cell[1]] + dot(&du[2*cell[1]], rr);
 
@@ -240,10 +244,11 @@ void FVM::compute_residual()
       auto xf = grid.get_bface_centroid(i);
       auto xl = grid.get_cell_centroid(cell);
       double rl[2];
-      rl[0] = xf[0] - xl[0]; rl[1] = xf[1] - xl[1];
+      rl[0] = xf[0] - xl[0];
+      rl[1] = xf[1] - xl[1];
       auto ul = u[cell] + dot(&du[2*cell], rl);
       auto ur = 0.0;
-      
+
       double v[2];
       advection_velocity(xf, v);
       auto normal = grid.get_bface_normal(i);
@@ -301,16 +306,17 @@ void FVM::run()
    read_grid_and_preprocess();
    allocate_memory();
    set_initial_condition();
-   compute_time_step();
-   t = 0; iter = 0;
    save_solution();
+   compute_time_step();
+
    while(t < param->tfinal)
    {
       if(t+dt > param->tfinal) dt = param->tfinal - t;
       for(unsigned int i=0; i<grid.get_n_cell(); ++i)
          uold[i] = u[i];
       update_solution();
-      t += dt; ++iter;
+      t += dt;
+      ++iter;
       cout << "iter, t = " << iter << " " << t << endl;
       if(iter % param->save_freq == 0 || abs(t-param->tfinal) < 1.0e-14)
          save_solution();
