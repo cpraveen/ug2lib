@@ -12,7 +12,7 @@ VTK_OBJ = $(patsubst %.cc,%.o,$(VTK_SRC))
 INC = $(GRID_INC) $(VTK_INC)
 OBJ = $(GRID_OBJ) $(VTK_OBJ)
 
-all: main ccfv1
+all: main ccfv1 ccfv2
 
 #------------------------------------------------------------------------------
 grid.o: $(GRID_INC) grid.cc
@@ -35,6 +35,12 @@ ccfv1.o: $(INC) ccfv1.cc
 
 ccfv1: $(OBJ) ccfv1.o
 	$(CXX) -o ccfv1 ccfv1.o $(OBJ)
+#------------------------------------------------------------------------------
+ccfv2.o: $(INC) ccfv2.cc
+	$(CXX) $(CXXFLAGS) -c ccfv2.cc
+
+ccfv2: $(OBJ) ccfv2.o
+	$(CXX) -o ccfv2 ccfv2.o $(OBJ)
 #------------------------------------------------------------------------------
 
 clean:
