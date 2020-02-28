@@ -160,6 +160,11 @@ public:
       return std::make_pair(end-start,&esue1[start]);
    }
 
+   inline std::pair<unsigned int,unsigned int> get_esue_range(unsigned int i)
+   {
+      return std::make_pair(esue2[i],esue2[i+1]);
+   }
+
    inline const unsigned int* get_iface_cell(unsigned int i)
    {
       return &iface_cell[2*i];
