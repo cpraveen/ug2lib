@@ -80,7 +80,7 @@ public:
    {
       return ctype[i];
    }
-   
+
    inline const double& get_cell_area(unsigned int i)
    {
       return carea[i];

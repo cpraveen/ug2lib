@@ -209,9 +209,9 @@ void FVM::compute_lscoef()
       auto cent_i = grid.get_cell_centroid(i);
       auto esue = grid.get_esue(i); // get surrounding cells
       double a11 = 0, a12 = 0, a22 = 0; // elements of A matrix
-      double *w = new double[esue.first]; // weights matrix W (1/r_ij)
-      double *dx = new double[esue.first];
-      double *dy = new double[esue.first]; // D matrix
+      double* w = new double[esue.first]; // weights matrix W (1/r_ij)
+      double* dx = new double[esue.first];
+      double* dy = new double[esue.first]; // D matrix
 
       // compute the elements of A, W and D matrix
       for(unsigned int j=0; j<esue.first; ++j)
