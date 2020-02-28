@@ -434,11 +434,12 @@ void read_parameters(Parameters& param, char* param_file)
 {
    ifstream file(param_file);
    assert(file.is_open());
-   file >> param.grid_file
-        >> param.tfinal
-        >> param.save_freq
-        >> param.esue_type
-        >> param.order;
+   string dummy;
+   file >> dummy >> param.grid_file;
+   file >> dummy >> param.tfinal;
+   file >> dummy >> param.save_freq;
+   file >> dummy >> param.esue_type;
+   file >> dummy >> param.order;
    file.close();
 }
 

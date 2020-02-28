@@ -1,0 +1,5 @@
+grid      square_hybrid.msh
+tfinal    1.0
+save_freq 100
+esue_type moore
+order     2

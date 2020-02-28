@@ -672,6 +672,22 @@ void Grid::construct_esue(const esue_type type)
    }
 
    std::cout << "Done\n";
+
+   // Check min, max esue
+   unsigned int esue_min = 100;
+   unsigned int esue_max = 0;
+   for(unsigned int i=0; i<n_cell; ++i)
+   {
+      auto esue = get_esue(i);
+      esue_min = min(esue_min, esue.first);
+      esue_max = max(esue_max, esue.first);
+   }
+   cout << "Min,max esue = " << esue_min << " " << esue_max << endl;
+   if(esue_min < 3)
+   {
+      cout << "Too few esue !!!\n";
+      exit(0);
+   }
 }
 
 // Compute the area of all cells
