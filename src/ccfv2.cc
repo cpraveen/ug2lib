@@ -505,12 +505,12 @@ void FVM::apply_vminmax_limiter()
          double u_v =  u[i] + dot(&du[2*i], rv); // reconstruct solution at vertex
          if(u_v > u_max[vertices.second[j]])
          {
-            double phi_c_v = (u_max[vertices.second[j]] - u[i]) / (u_v - u[i] + 1.0e-14);
+            double phi_c_v = (u_max[vertices.second[j]] - u[i]) / (u_v - u[i]);
             phi_c = min(phi_c, phi_c_v);
          }
          else if(u_v < u_min[vertices.second[j]])
          {
-            double phi_c_v = (u_min[vertices.second[j]] - u[i]) / (u_v - u[i] - 1.0e-14);
+            double phi_c_v = (u_min[vertices.second[j]] - u[i]) / (u_v - u[i]);
             phi_c = min(phi_c, phi_c_v);
          }
       }
@@ -558,15 +558,15 @@ void FVM::apply_barth_limiter()
 
       double ul = u[esuf[0]] + dot(&du[2*esuf[0]], rl); // reconstruction for left cell
       if(ul > u_max[esuf[0]])
-         phi[esuf[0]] = min(phi[esuf[0]], (u_max[esuf[0]] - u[esuf[0]]) / (ul - u[esuf[0]] + 1.0e-14));
+         phi[esuf[0]] = min(phi[esuf[0]], (u_max[esuf[0]] - u[esuf[0]]) / (ul - u[esuf[0]]));
       else if(ul < u_min[esuf[0]])
-         phi[esuf[0]] = min(phi[esuf[0]], (u_min[esuf[0]] - u[esuf[0]]) / (ul - u[esuf[0]] - 1.0e-14));
+         phi[esuf[0]] = min(phi[esuf[0]], (u_min[esuf[0]] - u[esuf[0]]) / (ul - u[esuf[0]]));
 
       double ur = u[esuf[1]] + dot(&du[2*esuf[1]], rr); // reconstruction for right cell
       if(ur > u_max[esuf[1]])
-         phi[esuf[1]] = min(phi[esuf[1]], (u_max[esuf[1]] - u[esuf[1]]) / (ur - u[esuf[1]] + 1.0e-14));
+         phi[esuf[1]] = min(phi[esuf[1]], (u_max[esuf[1]] - u[esuf[1]]) / (ur - u[esuf[1]]));
       else if(ur < u_min[esuf[1]])
-         phi[esuf[1]] = min(phi[esuf[1]], (u_min[esuf[1]] - u[esuf[1]]) / (ur - u[esuf[1]] - 1.0e-14));
+         phi[esuf[1]] = min(phi[esuf[1]], (u_min[esuf[1]] - u[esuf[1]]) / (ur - u[esuf[1]]));
    }
 
    // Boundary faces:
@@ -582,9 +582,9 @@ void FVM::apply_barth_limiter()
 
       double ul = u[esuf] + dot(&du[2*esuf], rl);
       if(ul > u_max[esuf])
-         phi[esuf] = min(phi[esuf], (u_max[esuf] - u[esuf]) / (ul - u[esuf] + 1.0e-14));
+         phi[esuf] = min(phi[esuf], (u_max[esuf] - u[esuf]) / (ul - u[esuf]));
       else if(ul < u_min[esuf])
-         phi[esuf] = min(phi[esuf], (u_min[esuf] - u[esuf]) / (ul - u[esuf] - 1.0e-14));
+         phi[esuf] = min(phi[esuf], (u_min[esuf] - u[esuf]) / (ul - u[esuf]));
    }
 
    // Apply the limiter on gradient
@@ -641,7 +641,7 @@ void FVM::apply_venkat_limiter()
       {
          double d2 = ul - u[esuf[0]];
          double d1 = u_max[esuf[0]] - u[esuf[0]];
-         double phi_temp = (1/d2 + 1.0e-14)*((d1*d1 + el)*d2 + 2*d2*d2*d1)
+         double phi_temp = (1/d2)*((d1*d1 + el)*d2 + 2*d2*d2*d1)
                                             /(d1*d1 + 2*d2*d2 + d1*d2 + el);
          phi[esuf[0]] = min(phi[esuf[0]], phi_temp);
       }
@@ -649,7 +649,7 @@ void FVM::apply_venkat_limiter()
       {
          double d2 = ul - u[esuf[0]];
          double d1 = u_min[esuf[0]] - u[esuf[0]];
-         double phi_temp = (1/d2 - 1.0e-14)*((d1*d1 + el)*d2 + 2*d2*d2*d1)
+         double phi_temp = (1/d2)*((d1*d1 + el)*d2 + 2*d2*d2*d1)
                                             /(d1*d1 + 2*d2*d2 + d1*d2 + el);
          phi[esuf[0]] = min(phi[esuf[0]], phi_temp);
       }
@@ -659,7 +659,7 @@ void FVM::apply_venkat_limiter()
       {
          double d2 = ur - u[esuf[1]];
          double d1 = u_max[esuf[1]] - u[esuf[1]];
-         double phi_temp = (1/d2 + 1.0e-14)*((d1*d1 + er)*d2 + 2*d2*d2*d1)
+         double phi_temp = (1/d2)*((d1*d1 + er)*d2 + 2*d2*d2*d1)
                                             /(d1*d1 + 2*d2*d2 + d1*d2 + er);
          phi[esuf[1]] = min(phi[esuf[1]], phi_temp);
       }
@@ -667,7 +667,7 @@ void FVM::apply_venkat_limiter()
       {
          double d2 = ur - u[esuf[1]];
          double d1 = u_min[esuf[1]] - u[esuf[1]];
-         double phi_temp = (1/d2 + 1.0e-14)*((d1*d1 + er)*d2 + 2*d2*d2*d1)
+         double phi_temp = (1/d2)*((d1*d1 + er)*d2 + 2*d2*d2*d1)
                                             /(d1*d1 + 2*d2*d2 + d1*d2 + er);
          phi[esuf[1]] = min(phi[esuf[1]], phi_temp);
       }
@@ -690,7 +690,7 @@ void FVM::apply_venkat_limiter()
       {
          double d2 = ul - u[esuf];
          double d1 = u_max[esuf] - u[esuf];
-         double phi_temp = (1/d2 + 1.0e-14)*((d1*d1 + el)*d2 + 2*d2*d2*d1)
+         double phi_temp = (1/d2)*((d1*d1 + el)*d2 + 2*d2*d2*d1)
                                             /(d1*d1 + 2*d2*d2 + d1*d2 + el);
          phi[esuf] = min(phi[esuf], phi_temp);
       }
@@ -698,7 +698,7 @@ void FVM::apply_venkat_limiter()
       {
          double d2 = ul - u[esuf];
          double d1 = u_min[esuf] - u[esuf];
-         double phi_temp = (1/d2 + 1.0e-14)*((d1*d1 + el)*d2 + 2*d2*d2*d1)
+         double phi_temp = (1/d2)*((d1*d1 + el)*d2 + 2*d2*d2*d1)
                                             /(d1*d1 + 2*d2*d2 + d1*d2 + el);
          phi[esuf] = min(phi[esuf], phi_temp);
       }
