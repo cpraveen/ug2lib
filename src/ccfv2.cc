@@ -3,6 +3,7 @@
 #include <cassert>
 #include <cstring>
 #include <fstream>
+#include <utility>
 
 #include "grid.h"
 #include "vtk_writer.h"
@@ -41,6 +42,16 @@ double initial_condition(const double* x)
    return exp(-50.0*r2);
 }
 
+// discontinuous initial condition
+double initial_condition_discontinuous(const double* x)
+{
+   if((x[0] >= 0.25 && x[0] <= 0.75)
+      && (x[1] >= -0.25 && x[1] <= 0.25)) // square
+      return 1;
+   else
+      return 0;
+}
+
 // upwind flux
 double num_flux(const double ul, const double ur,
                 const double* v, const double* normal)
@@ -56,6 +67,8 @@ struct Parameters
    int save_freq;
    string esue_type;
    int order;
+   string limiter;
+   string init_cond;
 };
 
 // class for finite volume method
@@ -78,6 +91,10 @@ private:
    void save_solution();
    void compute_lscoef();
    void compute_error();
+   void apply_vminmax_limiter();
+   void apply_barth_limiter();
+   void apply_venkat_limiter();
+   void compute_minmax();
 
    Parameters*  param;
    Grid         grid;
@@ -86,8 +103,10 @@ private:
    double*      res;  // residual
    double*      du;   // gradient of u
    double*      lscoef; // coefficients for least squares
+   double       *u_min, *u_max, *phi; // for limiter
 
    double       t, dt;
+   double       umin, umax;
    unsigned int iter;
 };
 
@@ -108,6 +127,9 @@ FVM::~FVM()
    if(!res)    delete[] res;
    if(!du)     delete[] du;
    if(!lscoef) delete[] lscoef;
+   if(!u_min)  delete[] u_min;
+   if(!u_max)  delete[] u_max;
+   if(!phi)    delete[] phi;
 }
 
 void FVM::read_grid_and_preprocess()
@@ -118,9 +140,11 @@ void FVM::read_grid_and_preprocess()
       grid.construct_esue(Grid::esue_neumann);
    else if(param->esue_type == "moore")
       grid.construct_esue(Grid::esue_moore);
+   else if(param->esue_type == "symmetric")
+      grid.construct_esue(Grid::esue_symmetric);
    else
    {
-      cout << "Invalid esue_type, options: moore/neumann\n";
+      cout << "Invalid esue_type, options: moore/neumann/symmetric\n";
       exit(0);
    }
    grid.compute_cell_area();
@@ -137,10 +161,24 @@ void FVM::allocate_memory()
    uold = new double[n_cell];
    res = new double[n_cell];
    du = new double[2*n_cell];
-
    // memory needed for storing least squares coefficients
    auto range = grid.get_esue_range(n_cell-1);
    lscoef = new double[2*range.second];
+
+   // memory needed for vertex-based minmax limiter
+   if(param->limiter == "vminmax")
+   {
+      u_min = new double[grid.get_n_vertex()];
+      u_max = new double[grid.get_n_vertex()];
+   }
+
+   // memory needed for barth's and venkatakrishnan's limiter
+   if(param->limiter == "venkatakrishnan" || param->limiter == "barth")
+   {
+      u_min = new double[grid.get_n_cell()];
+      u_max = new double[grid.get_n_cell()];
+      phi = new double[grid.get_n_cell()];
+   }
 }
 
 // set initial condition into solution array
@@ -150,7 +188,15 @@ void FVM::set_initial_condition()
    for(unsigned int i=0; i<n_cell; ++i)
    {
       auto x = grid.get_cell_centroid(i);
-      u[i] = initial_condition(x);
+      if(param->init_cond == "continuous")
+         u[i] = initial_condition(x);
+      else if(param->init_cond == "discontinuous")
+         u[i] = initial_condition_discontinuous(x);
+      else
+      {
+         cout << "Invalid init_cond, options: continuous/discontinuous\n";
+         exit(0);
+      }
    }
 }
 
@@ -206,8 +252,8 @@ void FVM::compute_lscoef()
    auto n_cell = grid.get_n_cell();
    for(unsigned int i=0; i<n_cell; ++i)
    {
-      auto cent_i = grid.get_cell_centroid(i);
       auto esue = grid.get_esue(i); // get surrounding cells
+      auto cent_i = grid.get_cell_centroid(i);
       double a11 = 0, a12 = 0, a22 = 0; // elements of A matrix
       double* w = new double[esue.first]; // weights matrix W (1/r_ij)
       double* dx = new double[esue.first];
@@ -276,6 +322,12 @@ void FVM::compute_gradient()
 void FVM::compute_residual()
 {
    compute_gradient();
+   if(param->limiter == "vminmax")
+      apply_vminmax_limiter();
+   else if(param->limiter == "venkatakrishnan")
+      apply_venkat_limiter();
+   else if(param->limiter == "barth")
+      apply_barth_limiter();
 
    auto n_cell = grid.get_n_cell();
    for(unsigned int i=0; i<n_cell; ++i)
@@ -394,12 +446,270 @@ void FVM::compute_error()
       auto uexact = initial_condition(x);
       auto area = grid.get_cell_area(i);
       l1error += abs(uexact - u[i]) * area;
-      l2error += pow(uexact-u[i],2) * area;
+      l2error += pow(uexact - u[i],2) * area;
       total_area += area;
    }
    l1error /= total_area;
    l2error = sqrt(l2error/total_area);
    cout << "l1 norm, l2 norm = " << l1error << " " << l2error << endl;
+}
+
+// find minimum and maximum value of u in the domain
+void FVM::compute_minmax()
+{
+   umin = 1.0e14;
+   umax = -1.0e14;
+   auto n_cell = grid.get_n_cell();
+   for(unsigned int i=0; i<n_cell; ++i)
+   {
+      umin = min(umin, u[i]);
+      umax = max(umax, u[i]);
+   }
+}
+
+// compute and apply min-max limiter on gradient
+void FVM::apply_vminmax_limiter()
+{
+   auto n_vertex = grid.get_n_vertex();
+   // Initialize u_min and u_max
+   for(unsigned int i=0; i<n_vertex; ++i)
+   {
+      u_min[i] = 1.0e14;
+      u_max[i] = -1.0e14;
+   }
+
+   auto n_cell = grid.get_n_cell();
+   for(unsigned int i=0; i<n_cell; ++i)
+   {
+      // find min and max value around a vertex
+      auto vertices = grid.get_cell_vertices(i); // get vertices of the cell
+      for(unsigned int j=0; j<vertices.first; ++j) // loop over cell vertices
+      {
+         u_min[vertices.second[j]] = min(u[i], u_min[vertices.second[j]]);
+         u_max[vertices.second[j]] = max(u[i], u_max[vertices.second[j]]);
+      }
+   }
+
+   // compute limiter
+   for(unsigned int i=0; i<n_cell; ++i)
+   {
+      double phi_c = 1;
+      auto xc = grid.get_cell_centroid(i); // cell centroid
+      auto vertices = grid.get_cell_vertices(i);
+      for(unsigned int j=0; j<vertices.first; ++j) // loop over cell vertices
+      {
+         auto xv = grid.get_coord(vertices.second[j]); // get coordinates of vertex
+         double rv[2]; // vector from cell centroid to vertex
+         rv[0] = xv[0] - xc[0];
+         rv[1] = xv[1] - xc[1];
+         double u_v =  u[i] + dot(&du[2*i], rv); // reconstruct solution at vertex
+         if(u_v > u_max[vertices.second[j]])
+         {
+            double phi_c_v = (u_max[vertices.second[j]] - u[i]) / (u_v - u[i] + 1.0e-14);
+            phi_c = min(phi_c, phi_c_v);
+         }
+         else if(u_v < u_min[vertices.second[j]])
+         {
+            double phi_c_v = (u_min[vertices.second[j]] - u[i]) / (u_v - u[i] - 1.0e-14);
+            phi_c = min(phi_c, phi_c_v);
+         }
+      }
+      du[2*i] *= phi_c;
+      du[2*i+1] *= phi_c;
+   }
+}
+
+// compute and apply Barth's limiter on gradient
+void FVM::apply_barth_limiter()
+{
+   auto n_cell = grid.get_n_cell();
+   // Initialize u_min, u_max and phi
+   for(unsigned int i=0; i<n_cell; ++i)
+   {
+      u_min[i] = u[i];
+      u_max[i] = u[i];
+      phi[i] = 1.0;
+   }
+
+   // loop over interior faces to find u_min and u_max for each cell and its neighbours
+   auto n_iface = grid.get_n_iface();
+   for(unsigned int i=0; i<n_iface; ++i)
+   {
+      auto esuf = grid.get_iface_cell(i); // get face neighbours
+      u_min[esuf[0]] = min(u_min[esuf[0]], u[esuf[1]]);
+      u_min[esuf[1]] = min(u_min[esuf[1]], u[esuf[0]]);
+      u_max[esuf[0]] = max(u_max[esuf[0]], u[esuf[1]]);
+      u_max[esuf[1]] = max(u_max[esuf[1]], u[esuf[0]]);
+   }
+
+   // loop over faces to find minimum phi for each cell
+   // Interior faces:
+   for(unsigned int i=0; i<n_iface; ++i)
+   {
+      auto esuf = grid.get_iface_cell(i); // get face neighbours
+      auto xf = grid.get_iface_centroid(i);
+      auto xl = grid.get_cell_centroid(esuf[0]); // left cell centroid
+      auto xr = grid.get_cell_centroid(esuf[1]); // right cell
+      double rl[2], rr[2]; // vectors from cell centroid to face centroid
+      rl[0] = xf[0] - xl[0];
+      rl[1] = xf[1] - xl[1];
+      rr[0] = xf[0] - xr[0];
+      rr[1] = xf[1] - xr[1];
+
+      double ul = u[esuf[0]] + dot(&du[2*esuf[0]], rl); // reconstruction for left cell
+      if(ul > u_max[esuf[0]])
+         phi[esuf[0]] = min(phi[esuf[0]], (u_max[esuf[0]] - u[esuf[0]]) / (ul - u[esuf[0]] + 1.0e-14));
+      else if(ul < u_min[esuf[0]])
+         phi[esuf[0]] = min(phi[esuf[0]], (u_min[esuf[0]] - u[esuf[0]]) / (ul - u[esuf[0]] - 1.0e-14));
+
+      double ur = u[esuf[1]] + dot(&du[2*esuf[1]], rr); // reconstruction for right cell
+      if(ur > u_max[esuf[1]])
+         phi[esuf[1]] = min(phi[esuf[1]], (u_max[esuf[1]] - u[esuf[1]]) / (ur - u[esuf[1]] + 1.0e-14));
+      else if(ur < u_min[esuf[1]])
+         phi[esuf[1]] = min(phi[esuf[1]], (u_min[esuf[1]] - u[esuf[1]]) / (ur - u[esuf[1]] - 1.0e-14));
+   }
+
+   // Boundary faces:
+   auto n_bface = grid.get_n_bface();
+   for(unsigned int i=0; i<n_bface; ++i)
+   {
+      auto esuf = grid.get_bface_cell(i);
+      auto xf = grid.get_bface_centroid(i);
+      auto xl = grid.get_cell_centroid(esuf);
+      double rl[2];
+      rl[0] = xf[0] - xl[0];
+      rl[1] = xf[1] - xl[1];
+
+      double ul = u[esuf] + dot(&du[2*esuf], rl);
+      if(ul > u_max[esuf])
+         phi[esuf] = min(phi[esuf], (u_max[esuf] - u[esuf]) / (ul - u[esuf] + 1.0e-14));
+      else if(ul < u_min[esuf])
+         phi[esuf] = min(phi[esuf], (u_min[esuf] - u[esuf]) / (ul - u[esuf] - 1.0e-14));
+   }
+
+   // Apply the limiter on gradient
+   for(unsigned int i=0; i<n_cell; ++i)
+   {
+      du[2*i] *= phi[i];
+      du[2*i+1] *= phi[i];
+   }
+}
+
+// compute and apply Venkatakrishnan's Limiter on gradient
+void FVM::apply_venkat_limiter()
+{
+   double K = 0.5; // parameter to control oscillation threshold
+
+   auto n_cell = grid.get_n_cell();
+   // Initialize u_min, u_max and phi
+   for(unsigned int i=0; i<n_cell; ++i)
+   {
+      u_min[i] = u[i];
+      u_max[i] = u[i];
+      phi[i] = 1.0;
+   }
+
+   // loop over interior faces to find u_min and u_max for each cell and its neighbours
+   auto n_iface = grid.get_n_iface();
+   for(unsigned int i=0; i<n_iface; ++i)
+   {
+      auto esuf = grid.get_iface_cell(i); // get face neighbours
+      u_min[esuf[0]] = min(u_min[esuf[0]], u[esuf[1]]);
+      u_min[esuf[1]] = min(u[esuf[0]], u_min[esuf[1]]);
+      u_max[esuf[0]] = max(u_max[esuf[0]], u[esuf[1]]);
+      u_max[esuf[1]] = max(u[esuf[0]], u_max[esuf[1]]);
+   }
+
+   // loop over faces to find minimum phi for each cell
+   // Interior faces:
+   for(unsigned int i=0; i<n_iface; ++i)
+   {
+      auto esuf = grid.get_iface_cell(i); // get face neighbours
+      auto xf = grid.get_iface_centroid(i);
+      auto xl = grid.get_cell_centroid(esuf[0]); // left cell centroid
+      auto xr = grid.get_cell_centroid(esuf[1]); // right cell
+      double el = pow(K*sqrt(grid.get_cell_area(esuf[0])), 3); // epsilon square for left cell
+      double er = pow(K*sqrt(grid.get_cell_area(esuf[1])), 3); // right cell
+      double rl[2], rr[2]; // vectors from cell centroid to face centroid
+      rl[0] = xf[0] - xl[0];
+      rl[1] = xf[1] - xl[1];
+      rr[0] = xf[0] - xr[0];
+      rr[1] = xf[1] - xr[1];
+
+      double ul = u[esuf[0]] + dot(&du[2*esuf[0]], rl); // reconstruction for left cell
+      if(ul > u_max[esuf[0]])
+      {
+         double d2 = ul - u[esuf[0]];
+         double d1 = u_max[esuf[0]] - u[esuf[0]];
+         double phi_temp = (1/d2 + 1.0e-14)*((d1*d1 + el)*d2 + 2*d2*d2*d1)
+                                            /(d1*d1 + 2*d2*d2 + d1*d2 + el);
+         phi[esuf[0]] = min(phi[esuf[0]], phi_temp);
+      }
+      else if(ul < u_min[esuf[0]])
+      {
+         double d2 = ul - u[esuf[0]];
+         double d1 = u_min[esuf[0]] - u[esuf[0]];
+         double phi_temp = (1/d2 - 1.0e-14)*((d1*d1 + el)*d2 + 2*d2*d2*d1)
+                                            /(d1*d1 + 2*d2*d2 + d1*d2 + el);
+         phi[esuf[0]] = min(phi[esuf[0]], phi_temp);
+      }
+      
+      double ur = u[esuf[1]] + dot(&du[2*esuf[1]], rr); // reconstruction for right cell
+      if(ur > u_max[esuf[1]])
+      {
+         double d2 = ur - u[esuf[1]];
+         double d1 = u_max[esuf[1]] - u[esuf[1]];
+         double phi_temp = (1/d2 + 1.0e-14)*((d1*d1 + er)*d2 + 2*d2*d2*d1)
+                                            /(d1*d1 + 2*d2*d2 + d1*d2 + er);
+         phi[esuf[1]] = min(phi[esuf[1]], phi_temp);
+      }
+      else if(ur < u_min[esuf[1]])
+      {
+         double d2 = ur - u[esuf[1]];
+         double d1 = u_min[esuf[1]] - u[esuf[1]];
+         double phi_temp = (1/d2 + 1.0e-14)*((d1*d1 + er)*d2 + 2*d2*d2*d1)
+                                            /(d1*d1 + 2*d2*d2 + d1*d2 + er);
+         phi[esuf[1]] = min(phi[esuf[1]], phi_temp);
+      }
+   }
+   
+   // Boundary faces:
+   auto n_bface = grid.get_n_bface();
+   for(unsigned int i=0; i<n_bface; ++i)
+   {
+      auto esuf = grid.get_bface_cell(i);
+      auto xf = grid.get_bface_centroid(i);
+      auto xl = grid.get_cell_centroid(esuf);
+      double el = pow(K*sqrt(grid.get_cell_area(esuf)), 3);
+      double rl[2];
+      rl[0] = xf[0] - xl[0];
+      rl[1] = xf[1] - xl[1];
+
+      double ul = u[esuf] + dot(&du[2*esuf], rl);
+      if(ul > u_max[esuf])
+      {
+         double d2 = ul - u[esuf];
+         double d1 = u_max[esuf] - u[esuf];
+         double phi_temp = (1/d2 + 1.0e-14)*((d1*d1 + el)*d2 + 2*d2*d2*d1)
+                                            /(d1*d1 + 2*d2*d2 + d1*d2 + el);
+         phi[esuf] = min(phi[esuf], phi_temp);
+      }
+      else if(ul < u_min[esuf])
+      {
+         double d2 = ul - u[esuf];
+         double d1 = u_min[esuf] - u[esuf];
+         double phi_temp = (1/d2 + 1.0e-14)*((d1*d1 + el)*d2 + 2*d2*d2*d1)
+                                            /(d1*d1 + 2*d2*d2 + d1*d2 + el);
+         phi[esuf] = min(phi[esuf], phi_temp);
+      }
+   }
+
+   // Apply the limiter on gradient
+   for(unsigned int i=0; i<n_cell; ++i)
+   {
+      du[2*i] *= phi[i];
+      du[2*i+1] *= phi[i];
+   }
 }
 
 void FVM::run()
@@ -420,13 +730,13 @@ void FVM::run()
          update_solution_rk1();
       else
          update_solution_rk2();
+      compute_minmax();
       t += dt;
       ++iter;
-      cout << "iter, t = " << iter << " " << t << endl;
+      cout << "iter, t = " << iter << " " << t << "; umin, umax = " << umin << " " << umax << endl;
       if(iter % param->save_freq == 0 || abs(t-param->tfinal) < 1.0e-14)
          save_solution();
    }
-
    compute_error();
 }
 
@@ -440,6 +750,8 @@ void read_parameters(Parameters& param, char* param_file)
    file >> dummy >> param.save_freq;
    file >> dummy >> param.esue_type;
    file >> dummy >> param.order;
+   file >> dummy >> param.limiter;
+   file >> dummy >> param.init_cond;
    file.close();
 }
 

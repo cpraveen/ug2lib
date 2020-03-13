@@ -20,6 +20,7 @@ Grid::Grid()
    has_esuf = false;
    has_esue_moore = false;
    has_esue_neumann = false;
+   has_esue_symmetric = false;
 }
 
 // destructor
@@ -39,6 +40,29 @@ Grid::~Grid()
    if(!iface_cell)  delete [] iface_cell;
    if(!esue1) delete [] esue1;
    if(!esue2) delete [] esue2;
+}
+
+// some utility functions
+// return euclidean distance b/w 2d vectors
+double Grid::distance(const double* a, const double* b)
+{
+   return sqrt(pow(a[0]-b[0],2) + pow(a[1]-b[1],2));
+}
+
+// return dot product of 2d vectors
+double Grid::dot(const double* a, const double* b)
+{
+   return a[0]*b[0] + a[1]*b[1];
+}
+
+// Calculates the cross product (ca x cb)
+bool Grid::orient(const double* a, const double* b, const double* c)
+{
+   double ar = (a[0]-c[0])*(b[1]-c[1]) - (b[0]-c[0])*(a[1]-c[1]);
+   if(ar < 0)
+      return 0;  // c is to the right of ab vector
+   else
+      return 1;  // c is to the left of ab vector
 }
 
 // Read mesh from file in gmsh format.
@@ -573,11 +597,11 @@ void Grid::construct_esuf()
 }
 
 // Find cells surrounding a cell
-// type = 0 => face connected neighbours only, 1 => all neighbours including the node connected ones
 void Grid::construct_esue(const esue_type type)
 {
    if(type == esue_neumann && has_esue_neumann) return;
    if(type == esue_moore && has_esue_moore) return;
+   if(type == esue_symmetric && has_esue_symmetric) return;
 
    if(type == esue_moore)  // Moore neighbours
    {
@@ -589,17 +613,26 @@ void Grid::construct_esue(const esue_type type)
       construct_esuf();
       std::cout << "Constructing cells surrounding cell: neumann ... ";
    }
+   else if(type == esue_symmetric) // Symmetric augmentation on Neumann neighbours
+   {
+      construct_esuf();
+      construct_esue(esue_moore); // symmetric cells to be chosen from Vertex neighbours
+      std::cout << "Performing esue symmetric augmentation ... ";
+   }
 
    // Delete if memory is already allocated
    // This is needed if e.g., we already have moore neighbours but now we
    // want neumann neighbours.
-   if(!esue1) delete[] esue1;
-   if(!esue2) delete[] esue2;
+   if(type != esue_symmetric) // for symmetric we need the moore neighbours
+   {
+      if(!esue1) delete[] esue1;
+      if(!esue2) delete[] esue2;
 
-   esue2 = new unsigned int[n_cell+1];
-   // Initialize esue2
-   for(unsigned int i=0; i<=n_cell; ++i)
-      esue2[i] = 0;
+      esue2 = new unsigned int[n_cell+1];
+      // Initialize esue2
+      for(unsigned int i=0; i<=n_cell; ++i)
+         esue2[i] = 0;
+   }
 
    if(type == esue_moore)  // Moore neighbours (we construct this similar to psup)
    {
@@ -637,8 +670,10 @@ void Grid::construct_esue(const esue_type type)
       esue1_temp.resize(0);
       delete [] lelem;
       has_esue_moore = true;
+      has_esue_neumann = false;
+      has_esue_symmetric = false;
    }
-   else  // Von-Neumann neighbours (we construct this similar to esup)
+   else if(type == esue_neumann)  // Von-Neumann neighbours (we construct this similar to esup)
    {
       // construct esue2
       for(unsigned int iface=0; iface<n_iface; ++iface)  // loop over all the faces
@@ -669,6 +704,256 @@ void Grid::construct_esue(const esue_type type)
          esue2[i] = esue2[i-1];
       esue2[0] = 0;
       has_esue_neumann = true;
+      has_esue_moore = false;
+      has_esue_symmetric = false;
+   }
+   else if(type == esue_symmetric) // Symmetric augmentation on neumann neighbours
+   {
+      double theta = 3.0*M_PI/4.0; // range of acceptable symmetric cells
+
+      compute_cell_centroid();
+      compute_face_centroid();
+
+      unsigned int* symm2 = new unsigned int[n_cell+1];
+      // Initialize symm2
+      for(unsigned int i=0; i<n_cell+1; ++i)
+         symm2[i] = 0;
+      // construct symm2
+      // Interior faces:
+      for(unsigned int i=0; i<n_iface; ++i) // loop over interior faces
+      {
+         auto esuf = get_iface_cell(i);
+         for(unsigned int iesuf=0; iesuf<2; ++iesuf) // left and right cell
+         {
+            // add face neighbour and the symmetric counterpart
+            ++symm2[esuf[iesuf]+1]; // add face neighbour
+            // find its symmetric cell
+            auto xi = get_cell_centroid(esuf[iesuf]);
+            auto xj = get_cell_centroid(esuf[(iesuf+1)%2]);
+            double e_ij[2]; // unit vector from centroid of left cell to right cell
+            e_ij[0] = (xj[0] - xi[0]) / distance(xj, xi);
+            e_ij[1] = (xj[1] - xi[1]) / distance(xj, xi);
+            auto cell = get_cell_vertices(esuf[iesuf]);
+            std::vector<unsigned int> cell_i(cell.first); // needed to perform intersection
+            for(unsigned int j=0; j<cell.first; ++j)
+               cell_i[j] = cell.second[j];
+            std::sort(cell_i.begin(), cell_i.end());
+            auto esue = get_esue(esuf[iesuf]); // get moore neighbours
+            double dv_min = 1;
+            unsigned int nv = 0;
+            for(unsigned int k=0; k<esue.first; ++k) // loop over moore neighbours
+            {
+               auto xk = get_cell_centroid(esue.second[k]);
+               double e_ik[2]; // unit vector from i to k
+               e_ik[0] = (xk[0] - xi[0]) / distance(xk, xi);
+               e_ik[1] = (xk[1] - xi[1]) / distance(xk, xi);
+               double dv = dot(e_ij, e_ik);
+               if(dv < cos(theta))
+               {
+                  auto cell = get_cell_vertices(esue.second[k]);
+                  std::vector<unsigned int> cell_k(cell.first); // for intersection
+                  for(unsigned int j=0; j<cell.first; ++j)
+                     cell_k[j] = cell.second[j];
+                  std::sort(cell_k.begin(), cell_k.end());
+                  // find intersection of vertices (if 1 vertex => vertex nbr else face nbr)
+                  std::vector<unsigned int> inter(cell.first);
+                  auto ls = std::set_intersection(cell_i.begin(), cell_i.end(),
+                                                  cell_k.begin(), cell_k.end(), inter.begin());
+                  if(dv < dv_min) // vertex nbr with dv < cos(theta)
+                  {
+                     dv_min = dv;
+                     nv = ls - inter.begin();
+                  }
+               }
+            }
+            if(dv_min != 1 && nv == 1) // some symmetric cell was found which is also a vertex nbr
+               ++symm2[esuf[iesuf]+1];
+         }
+      }
+      // Boundary faces:
+      for(unsigned int i=0; i<n_bface; ++i) // loop over boundary faces
+      {
+         auto esuf = get_bface_cell(i);
+         // find symmetric cell for the bface
+         auto xi = get_cell_centroid(esuf);
+         auto xj = get_bface_centroid(i); // use face centroid instead of cell for boundary
+         double e_ij[2]; // unit vector from centroid of left cell to bface centroid
+         e_ij[0] = (xj[0] - xi[0]) / distance(xj, xi);
+         e_ij[1] = (xj[1] - xi[1]) / distance(xj, xi);
+         auto cell = get_cell_vertices(esuf);
+         std::vector<unsigned int> cell_i(cell.first); // needed to perform intersection
+         for(unsigned int j=0; j<cell.first; ++j)
+            cell_i[j] = cell.second[j];
+         std::sort(cell_i.begin(), cell_i.end());
+         auto esue = get_esue(esuf); // get moore neighbours
+         double dv_min = 1;
+         unsigned int nv = 0;
+         for(unsigned int k=0; k<esue.first; ++k) // loop over moore neighbours
+         {
+            auto xk = get_cell_centroid(esue.second[k]);
+            double e_ik[2]; // unit vector from i to k
+            e_ik[0] = (xk[0] - xi[0]) / distance(xk, xi);
+            e_ik[1] = (xk[1] - xi[1]) / distance(xk, xi);
+            double dv = dot(e_ij, e_ik);
+            if(dv < cos(theta))
+            {
+               auto cell = get_cell_vertices(esue.second[k]);
+               std::vector<unsigned int> cell_k(cell.first); // for intersection
+               for(unsigned int j=0; j<cell.first; ++j)
+                  cell_k[j] = cell.second[j];
+               std::sort(cell_k.begin(), cell_k.end());
+               // find intersection of vertices (if 1 vertex => vertex nbr else face nbr)
+               std::vector<unsigned int> inter(cell.first);
+               auto ls = std::set_intersection(cell_i.begin(), cell_i.end(),
+                                               cell_k.begin(), cell_k.end(), inter.begin());
+               if(dv < dv_min) // vertex nbr with dv < cos(theta)
+               {
+                  dv_min = dv;
+                  nv = ls - inter.begin();
+               }
+            }
+         }
+         if(dv_min != 1 && nv == 1) // some symmetric cell was found which is also a vertex nbr
+            ++symm2[esuf+1];
+      }
+      for(unsigned int i=0; i<n_cell; ++i)
+         symm2[i+1] += symm2[i];
+
+      // construct symm1
+      unsigned int* symm1 = new unsigned int[symm2[n_cell]];
+      // Interior faces:
+      for(unsigned int i=0; i<n_iface; ++i) // loop over interior faces
+      {
+         auto esuf = get_iface_cell(i);
+         for(unsigned int iesuf=0; iesuf<2; ++iesuf) // left and right cell
+         {
+            // add face neighbour and the symmetric counterpart
+            // left cell:
+            unsigned int istor = symm2[esuf[iesuf]]; // add face neighbour
+            symm1[istor] = esuf[(iesuf+1)%2];
+            ++symm2[esuf[iesuf]];
+            // find its symmetric cell
+            auto xi = get_cell_centroid(esuf[iesuf]);
+            auto xj = get_cell_centroid(esuf[(iesuf+1)%2]);
+            double e_ij[2]; // unit vector from centroid of left cell to right cell
+            e_ij[0] = (xj[0] - xi[0]) / distance(xj, xi);
+            e_ij[1] = (xj[1] - xi[1]) / distance(xj, xi);
+            auto cell = get_cell_vertices(esuf[iesuf]);
+            std::vector<unsigned int> cell_i(cell.first); // needed to perform intersection
+            for(unsigned int j=0; j<cell.first; ++j)
+               cell_i[j] = cell.second[j];
+            std::sort(cell_i.begin(), cell_i.end());
+            auto esue = get_esue(esuf[iesuf]); // get moore neighbours
+            double dv_min = 1;
+            unsigned int symm_cell = 0;
+            unsigned int nv = 0; // number of common vertices
+            for(unsigned int k=0; k<esue.first; ++k) // loop over moore neighbours
+            {
+               auto xk = get_cell_centroid(esue.second[k]);
+               double e_ik[2]; // unit vector from i to k
+               e_ik[0] = (xk[0] - xi[0]) / distance(xk, xi);
+               e_ik[1] = (xk[1] - xi[1]) / distance(xk, xi);
+               double dv = dot(e_ij, e_ik);
+               if(dv < cos(theta))
+               {
+                  auto cell = get_cell_vertices(esue.second[k]);
+                  std::vector<unsigned int> cell_k(cell.first); // for intersection
+                  for(unsigned int j=0; j<cell.first; ++j)
+                     cell_k[j] = cell.second[j];
+                  std::sort(cell_k.begin(), cell_k.end());
+                  // find intersection of vertices (if 1 vertex => vertex nbr else face nbr)
+                  std::vector<unsigned int> inter(cell.first);
+                  auto ls = std::set_intersection(cell_i.begin(), cell_i.end(),
+                                                  cell_k.begin(), cell_k.end(), inter.begin());
+                  if(dv < dv_min) // vertex nbr with dv < cos(theta)
+                  {
+                     dv_min = dv;
+                     symm_cell = esue.second[k];
+                     nv = ls - inter.begin();
+                  }
+               }
+            }
+            if(dv_min != 1 && nv == 1) // some symmetric cell was found which is also a vertex nbr
+            {
+               istor = symm2[esuf[iesuf]];
+               symm1[istor] = symm_cell;
+               ++symm2[esuf[iesuf]];
+            }
+         }
+      }
+
+      // Boundary faces:
+      for(unsigned int i=0; i<n_bface; ++i) // loop over boundary faces
+      {
+         auto esuf = get_bface_cell(i);
+         // find symmetric cell for the bface
+         auto xi = get_cell_centroid(esuf);
+         auto xj = get_bface_centroid(i);
+         double e_ij[2]; // unit vector from centroid of cell to bface centroid
+         e_ij[0] = (xj[0] - xi[0]) / distance(xj, xi);
+         e_ij[1] = (xj[1] - xi[1]) / distance(xj, xi);
+         auto cell = get_cell_vertices(esuf);
+         std::vector<unsigned int> cell_i(cell.first); // needed to perform intersection
+         for(unsigned int j=0; j<cell.first; ++j)
+            cell_i[j] = cell.second[j];
+         std::sort(cell_i.begin(), cell_i.end());
+         auto esue = get_esue(esuf); // get moore neighbours
+         double dv_min = 1;
+         unsigned int symm_cell = 0;
+         unsigned int nv = 0; // number of common vertex
+         for(unsigned int k=0; k<esue.first; ++k) // loop over moore neighbours
+         {
+            auto xk = get_cell_centroid(esue.second[k]);
+            double e_ik[2]; // unit vector from i to k
+            e_ik[0] = (xk[0] - xi[0]) / distance(xk, xi);
+            e_ik[1] = (xk[1] - xi[1]) / distance(xk, xi);
+            double dv = dot(e_ij, e_ik);
+            if(dv < cos(theta))
+            {
+               auto cell = get_cell_vertices(esue.second[k]);
+               std::vector<unsigned int> cell_k(cell.first); // for intersection
+               for(unsigned int j=0; j<cell.first; ++j)
+                  cell_k[j] = cell.second[j];
+               std::sort(cell_k.begin(), cell_k.end());
+               // find intersection of vertices (if 1 vertex => vertex nbr else face nbr)
+               std::vector<unsigned int> inter(cell.first);
+               auto ls = std::set_intersection(cell_i.begin(), cell_i.end(),
+                                               cell_k.begin(), cell_k.end(), inter.begin());
+               if(dv < dv_min)
+               {
+                  dv_min = dv;
+                  symm_cell = esue.second[k];
+                  nv = ls - inter.begin();
+               }
+            }
+         }
+         if(dv_min != 1 && nv == 1) // some symmetric cell was found which is also a vertex nbr
+         {
+            unsigned int istor = symm2[esuf];
+            symm1[istor] = symm_cell;
+            ++symm2[esuf];
+         }
+      }
+
+      // reshuffle symm2
+      for(unsigned int i=n_cell; i>0; --i)
+         symm2[i] = symm2[i-1];
+      symm2[0] = 0;
+
+      // delete moore nbrs from esue and copy symmetric nbrs
+      delete[] esue1;
+      delete[] esue2;
+      esue1 = new unsigned int[symm2[n_cell]];
+      esue2 = new unsigned int[n_cell+1];
+      for(unsigned int i=0; i<n_cell+1; ++i)
+         esue2[i] = symm2[i];
+      for(unsigned int i=0; i<symm2[n_cell]; ++i)
+         esue1[i] = symm1[i];
+      delete[] symm1;
+      delete[] symm2;
+      has_esue_neumann = false;
+      has_esue_moore = false;
+      has_esue_symmetric = true;
    }
 
    std::cout << "Done\n";
@@ -683,7 +968,8 @@ void Grid::construct_esue(const esue_type type)
       esue_max = max(esue_max, esue.first);
    }
    cout << "Min,max esue = " << esue_min << " " << esue_max << endl;
-   if(esue_min < 3)
+
+   if(esue_min < 3 && type == esue_neumann)
    {
       cout << "Too few esue !!!\n";
       exit(0);

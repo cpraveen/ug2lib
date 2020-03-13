@@ -23,7 +23,7 @@ namespace Gmsh
 class Grid
 {
 public:
-   enum esue_type {esue_neumann, esue_moore, esue_none};
+   enum esue_type {esue_neumann, esue_moore, esue_symmetric, esue_none};
    enum psup_type {psup_all, psup_edge, psup_none};
 
    Grid();
@@ -227,17 +227,12 @@ private:
    bool         has_esuf;
    bool         has_esue_moore;
    bool         has_esue_neumann;
-};
+   bool         has_esue_symmetric;
 
-// Calculates the cross product (ca x cb)
-inline bool orient(const double* a, const double* b, const double* c)
-{
-   double ar = (a[0]-c[0])*(b[1]-c[1]) - (b[0]-c[0])*(a[1]-c[1]);
-   if(ar < 0)
-      return 0;  // c is to the right of ab vector
-   else
-      return 1;  // c is to the left of ab vector
-}
+   static double distance(const double* a, const double* b);
+   static double dot(const double* a, const double* b);
+   static bool orient(const double* a, const double* b, const double* c);
+};
 
 void grid_test1(); // Function to dump the constructed data (for reference mesh)
 
