@@ -215,6 +215,16 @@ public:
       return psup_none;
    }
 
+   inline bool cell_is_real(unsigned int i)
+   {
+      return (i < n_cell) ? true : false;
+   }
+
+   inline bool vertex_is_real(unsigned int i)
+   {
+      return (i < n_vertex) ? true : false;
+   }
+
 private:
    const int     dim = 2;
    unsigned int  n_vertex, n_cell, n_tri, n_quad, n_bface, n_iface;
