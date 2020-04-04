@@ -31,6 +31,7 @@ public:
    void read_gmsh(const std::string grid_file);
    void write_vtk(std::ofstream& vtk);
    void write_vtk(const std::string filename);
+   void write_msh(const std::string filename);
    void construct_esup();
    void construct_psup(const psup_type type);
    void construct_iface();
@@ -46,9 +47,19 @@ public:
       return n_vertex;
    }
 
+   inline unsigned int get_n_total_vertex()
+   {
+      return n_total_vertex;
+   }
+
    inline unsigned int get_n_cell()
    {
       return n_cell;
+   }
+
+   inline unsigned int get_n_total_cell()
+   {
+      return n_total_cell;
    }
 
    inline unsigned int get_n_tri()
@@ -170,9 +181,24 @@ public:
       return &iface_cell[2*i];
    }
 
-   inline const unsigned int& get_bface_cell(unsigned int i)
+   inline const unsigned int get_bface_cell(unsigned int i)
    {
       return bface_cell[i];
+   }
+
+   inline unsigned int map_ghost_cell(unsigned int i)
+   {
+      return ghost_cell[i-n_cell];
+   }
+
+   inline unsigned int map_ghost_vertex(unsigned int i)
+   {
+      return ghost_vertex[i-n_vertex];
+   }
+
+   inline bool periodic()
+   {
+      return has_periodic;
    }
 
    inline esue_type get_esue_type()
@@ -192,6 +218,7 @@ public:
 private:
    const int     dim = 2;
    unsigned int  n_vertex, n_cell, n_tri, n_quad, n_bface, n_iface;
+   unsigned int  n_ghost_cell, n_ghost_vertex, n_total_cell, n_total_vertex;
    double*       coord;
 
    // cell data
@@ -220,6 +247,12 @@ private:
    unsigned int* iface_cell; // cells adjacent to face
    double*       iface_centroid; //centroid of iface
 
+   // Periodic boundary data
+   unsigned int* periodicity;  // periodicity of nodes (0, 1, 2)
+   unsigned int* prd_node;     // map of periodic nodes
+   unsigned int* ghost_cell;   // map of ghost and real cells
+   unsigned int* ghost_vertex; // map of ghost and real vertices
+
    bool         has_esup;
    bool         has_psup_all;
    bool         has_psup_edge;
@@ -228,6 +261,7 @@ private:
    bool         has_esue_moore;
    bool         has_esue_neumann;
    bool         has_esue_symmetric;
+   bool         has_periodic;
 
    static double distance(const double* a, const double* b);
    static double dot(const double* a, const double* b);

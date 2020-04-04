@@ -28,22 +28,36 @@ double dot(const double* a, const double* b)
    return a[0]*b[0] + a[1]*b[1];
 }
 
-// advection velocity in linear advection problem
+// Set advection speed as per the test case
+#if defined(CONT_ROT) || defined(DISC_ROT)
 void advection_velocity(const double* x, double* v)
 {
    v[0] =  x[1];
    v[1] = -x[0];
 }
+#elif defined(PERIODIC_X)
+void advection_velocity(const double* x, double* v)
+{
+   v[0] =  0.5;
+   v[1] =  0;
+}
+#elif defined(PERIODIC_XY)
+void advection_velocity(const double* x, double* v)
+{
+   v[0] =  0.5;
+   v[1] =  0.5;
+}
+#endif
 
-// initial condition as a function of x,y
+// set initial condition as per the test case
+#if defined(CONT_ROT) // smooth initial condition, centered at (0.5, 0)
 double initial_condition(const double* x)
 {
    double r2 = pow(x[0]-0.5,2) + pow(x[1],2);
    return exp(-50.0*r2);
 }
-
-// discontinuous initial condition
-double initial_condition_discontinuous(const double* x)
+#elif defined(DISC_ROT) // discontinuous initial condition
+double initial_condition(const double* x)
 {
    if((x[0] >= 0.25 && x[0] <= 0.75)
       && (x[1] >= -0.25 && x[1] <= 0.25)) // square
@@ -51,6 +65,13 @@ double initial_condition_discontinuous(const double* x)
    else
       return 0;
 }
+#elif defined(PERIODIC_X) || defined(PERIODIC_XY) // smooth, centered at (0, 0)
+double initial_condition(const double* x)
+{
+   double r2 = pow(x[0],2) + pow(x[1],2);
+   return exp(-50.0*r2);
+}
+#endif
 
 // upwind flux
 double num_flux(const double ul, const double ur,
@@ -68,7 +89,6 @@ struct Parameters
    string esue_type;
    int order;
    string limiter;
-   string init_cond;
 };
 
 // class for finite volume method
@@ -95,6 +115,8 @@ private:
    void apply_barth_limiter();
    void apply_venkat_limiter();
    void compute_minmax();
+   void update_ghost_solution();
+   void update_ghost_gradient();
 
    Parameters*  param;
    Grid         grid;
@@ -144,7 +166,8 @@ void FVM::read_grid_and_preprocess()
       grid.construct_esue(Grid::esue_symmetric);
    else
    {
-      cout << "Invalid esue_type, options: moore/neumann/symmetric\n";
+      cout << "Invalid esue_type =" << param->esue_type 
+           << ", options: moore/neumann/symmetric\n";
       exit(0);
    }
    grid.compute_cell_area();
@@ -156,11 +179,12 @@ void FVM::read_grid_and_preprocess()
 void FVM::allocate_memory()
 {
    auto n_cell = grid.get_n_cell();
+   auto n_total_cell = grid.get_n_total_cell(); // including ghost cell, if any
 
-   u = new double[n_cell];
-   uold = new double[n_cell];
-   res = new double[n_cell];
-   du = new double[2*n_cell];
+   u = new double[n_total_cell];
+   uold = new double[n_cell]; // ghost cell values not needed
+   res = new double[n_total_cell];
+   du = new double[2*n_total_cell];
    // memory needed for storing least squares coefficients
    auto range = grid.get_esue_range(n_cell-1);
    lscoef = new double[2*range.second];
@@ -188,24 +212,16 @@ void FVM::set_initial_condition()
    for(unsigned int i=0; i<n_cell; ++i)
    {
       auto x = grid.get_cell_centroid(i);
-      if(param->init_cond == "continuous")
-         u[i] = initial_condition(x);
-      else if(param->init_cond == "discontinuous")
-         u[i] = initial_condition_discontinuous(x);
-      else
-      {
-         cout << "Invalid init_cond, options: continuous/discontinuous\n";
-         exit(0);
-      }
+      u[i] = initial_condition(x);
    }
 }
 
 // compute dt using cfl condition based on maximum principle
 void FVM::compute_time_step()
 {
-   auto n_cell = grid.get_n_cell();
-   vector<double> tmp(n_cell);
-   for(unsigned int i=0; i<n_cell; ++i)
+   auto n_total_cell = grid.get_n_total_cell();
+   vector<double> tmp(n_total_cell);
+   for(unsigned int i=0; i<n_total_cell; ++i)
       tmp[i] = 0.0;
 
    auto n_iface = grid.get_n_iface();
@@ -238,7 +254,7 @@ void FVM::compute_time_step()
    }
 
    dt = 1.0e20;
-   for(unsigned int i=0; i<n_cell; ++i)
+   for(unsigned int i=0; i<n_total_cell; ++i)
    {
       auto area = grid.get_cell_area(i);
       dt = fmin(dt, area/(tmp[i]+1.0e-14));
@@ -317,10 +333,29 @@ void FVM::compute_gradient()
    }
 }
 
+// update solution value for ghost cells
+void FVM::update_ghost_solution()
+{
+   for(unsigned int i=grid.get_n_cell(); i<grid.get_n_total_cell(); ++i)
+      u[i] = u[grid.map_ghost_cell(i)];
+}
+
+// update gradient value for ghost cells
+void FVM::update_ghost_gradient()
+{
+   for(unsigned int i=grid.get_n_cell(); i<grid.get_n_total_cell(); ++i)
+   {
+      auto r = grid.map_ghost_cell(i); // get real cell number
+      du[2*i] = du[2*r];
+      du[2*i+1] = du[2*r+1];
+   }
+}
+
 // compute finite volume residual R in the semi-discrete equation
 // A*du/dt + R = 0, A = cell area
 void FVM::compute_residual()
 {
+   update_ghost_solution(); // update solution values before gradient computation
    compute_gradient();
    if(param->limiter == "vminmax")
       apply_vminmax_limiter();
@@ -328,9 +363,10 @@ void FVM::compute_residual()
       apply_venkat_limiter();
    else if(param->limiter == "barth")
       apply_barth_limiter();
+   update_ghost_gradient(); // update gradient value for ghost cells
 
-   auto n_cell = grid.get_n_cell();
-   for(unsigned int i=0; i<n_cell; ++i)
+   auto n_total_cell = grid.get_n_total_cell();
+   for(unsigned int i=0; i<n_total_cell; ++i)
       res[i] = 0.0;
 
    // interior faces
@@ -470,6 +506,8 @@ void FVM::compute_minmax()
 // compute and apply min-max limiter on gradient
 void FVM::apply_vminmax_limiter()
 {
+   // ghost cell values are included for finding min max values at vertices,
+   // so that, ghost neighbour values are also considered for limiting the gradient
    auto n_vertex = grid.get_n_vertex();
    // Initialize u_min and u_max
    for(unsigned int i=0; i<n_vertex; ++i)
@@ -478,20 +516,23 @@ void FVM::apply_vminmax_limiter()
       u_max[i] = -1.0e14;
    }
 
-   auto n_cell = grid.get_n_cell();
-   for(unsigned int i=0; i<n_cell; ++i)
+   auto n_total_cell = grid.get_n_total_cell();
+   for(unsigned int i=0; i<n_total_cell; ++i)
    {
       // find min and max value around a vertex
       auto vertices = grid.get_cell_vertices(i); // get vertices of the cell
       for(unsigned int j=0; j<vertices.first; ++j) // loop over cell vertices
       {
-         u_min[vertices.second[j]] = min(u[i], u_min[vertices.second[j]]);
-         u_max[vertices.second[j]] = max(u[i], u_max[vertices.second[j]]);
+         if(vertices.second[j] < n_vertex) // only real vertices of ghost cells
+         {
+            u_min[vertices.second[j]] = min(u[i], u_min[vertices.second[j]]);
+            u_max[vertices.second[j]] = max(u[i], u_max[vertices.second[j]]);
+         }
       }
    }
 
    // compute limiter
-   for(unsigned int i=0; i<n_cell; ++i)
+   for(unsigned int i=0; i<grid.get_n_cell(); ++i) // only real cells
    {
       double phi_c = 1;
       auto xc = grid.get_cell_centroid(i); // cell centroid
@@ -523,7 +564,7 @@ void FVM::apply_vminmax_limiter()
 void FVM::apply_barth_limiter()
 {
    auto n_cell = grid.get_n_cell();
-   // Initialize u_min, u_max and phi
+   // Initialize u_min, u_max and phi (includes ghost cells)
    for(unsigned int i=0; i<n_cell; ++i)
    {
       u_min[i] = u[i];
@@ -536,10 +577,16 @@ void FVM::apply_barth_limiter()
    for(unsigned int i=0; i<n_iface; ++i)
    {
       auto esuf = grid.get_iface_cell(i); // get face neighbours
-      u_min[esuf[0]] = min(u_min[esuf[0]], u[esuf[1]]);
-      u_min[esuf[1]] = min(u_min[esuf[1]], u[esuf[0]]);
-      u_max[esuf[0]] = max(u_max[esuf[0]], u[esuf[1]]);
-      u_max[esuf[1]] = max(u_max[esuf[1]], u[esuf[0]]);
+      if(esuf[0] < n_cell) // real cell
+      {
+         u_min[esuf[0]] = min(u_min[esuf[0]], u[esuf[1]]);
+         u_max[esuf[0]] = max(u_max[esuf[0]], u[esuf[1]]);
+      }
+      if(esuf[1] < n_cell) // real cell
+      {
+         u_min[esuf[1]] = min(u_min[esuf[1]], u[esuf[0]]);
+         u_max[esuf[1]] = max(u_max[esuf[1]], u[esuf[0]]);
+      }
    }
 
    // loop over faces to find minimum phi for each cell
@@ -556,17 +603,22 @@ void FVM::apply_barth_limiter()
       rr[0] = xf[0] - xr[0];
       rr[1] = xf[1] - xr[1];
 
-      double ul = u[esuf[0]] + dot(&du[2*esuf[0]], rl); // reconstruction for left cell
-      if(ul > u_max[esuf[0]])
-         phi[esuf[0]] = min(phi[esuf[0]], (u_max[esuf[0]] - u[esuf[0]]) / (ul - u[esuf[0]]));
-      else if(ul < u_min[esuf[0]])
-         phi[esuf[0]] = min(phi[esuf[0]], (u_min[esuf[0]] - u[esuf[0]]) / (ul - u[esuf[0]]));
-
-      double ur = u[esuf[1]] + dot(&du[2*esuf[1]], rr); // reconstruction for right cell
-      if(ur > u_max[esuf[1]])
-         phi[esuf[1]] = min(phi[esuf[1]], (u_max[esuf[1]] - u[esuf[1]]) / (ur - u[esuf[1]]));
-      else if(ur < u_min[esuf[1]])
-         phi[esuf[1]] = min(phi[esuf[1]], (u_min[esuf[1]] - u[esuf[1]]) / (ur - u[esuf[1]]));
+      if(esuf[0] < n_cell) // real cell
+      {
+         double ul = u[esuf[0]] + dot(&du[2*esuf[0]], rl); // reconstruction for left cell
+         if(ul > u_max[esuf[0]])
+            phi[esuf[0]] = min(phi[esuf[0]], (u_max[esuf[0]] - u[esuf[0]]) / (ul - u[esuf[0]]));
+         else if(ul < u_min[esuf[0]])
+            phi[esuf[0]] = min(phi[esuf[0]], (u_min[esuf[0]] - u[esuf[0]]) / (ul - u[esuf[0]]));
+      }
+      if(esuf[1] < n_cell) // real cell
+      {
+         double ur = u[esuf[1]] + dot(&du[2*esuf[1]], rr); // reconstruction for right cell
+         if(ur > u_max[esuf[1]])
+            phi[esuf[1]] = min(phi[esuf[1]], (u_max[esuf[1]] - u[esuf[1]]) / (ur - u[esuf[1]]));
+         else if(ur < u_min[esuf[1]])
+            phi[esuf[1]] = min(phi[esuf[1]], (u_min[esuf[1]] - u[esuf[1]]) / (ur - u[esuf[1]]));
+      }
    }
 
    // Boundary faces:
@@ -614,10 +666,16 @@ void FVM::apply_venkat_limiter()
    for(unsigned int i=0; i<n_iface; ++i)
    {
       auto esuf = grid.get_iface_cell(i); // get face neighbours
-      u_min[esuf[0]] = min(u_min[esuf[0]], u[esuf[1]]);
-      u_min[esuf[1]] = min(u[esuf[0]], u_min[esuf[1]]);
-      u_max[esuf[0]] = max(u_max[esuf[0]], u[esuf[1]]);
-      u_max[esuf[1]] = max(u[esuf[0]], u_max[esuf[1]]);
+      if(esuf[0] < n_cell)
+      {
+         u_min[esuf[0]] = min(u_min[esuf[0]], u[esuf[1]]);
+         u_max[esuf[0]] = max(u_max[esuf[0]], u[esuf[1]]);
+      }
+      if(esuf[1] < n_cell)
+      {
+         u_min[esuf[1]] = min(u[esuf[0]], u_min[esuf[1]]);
+         u_max[esuf[1]] = max(u[esuf[0]], u_max[esuf[1]]);
+      }
    }
 
    // loop over faces to find minimum phi for each cell
@@ -635,41 +693,47 @@ void FVM::apply_venkat_limiter()
       rl[1] = xf[1] - xl[1];
       rr[0] = xf[0] - xr[0];
       rr[1] = xf[1] - xr[1];
-
-      double ul = u[esuf[0]] + dot(&du[2*esuf[0]], rl); // reconstruction for left cell
-      if(ul > u_max[esuf[0]])
-      {
-         double d2 = ul - u[esuf[0]];
-         double d1 = u_max[esuf[0]] - u[esuf[0]];
-         double phi_temp = (1/d2)*((d1*d1 + el)*d2 + 2*d2*d2*d1)
-                                            /(d1*d1 + 2*d2*d2 + d1*d2 + el);
-         phi[esuf[0]] = min(phi[esuf[0]], phi_temp);
-      }
-      else if(ul < u_min[esuf[0]])
-      {
-         double d2 = ul - u[esuf[0]];
-         double d1 = u_min[esuf[0]] - u[esuf[0]];
-         double phi_temp = (1/d2)*((d1*d1 + el)*d2 + 2*d2*d2*d1)
-                                            /(d1*d1 + 2*d2*d2 + d1*d2 + el);
-         phi[esuf[0]] = min(phi[esuf[0]], phi_temp);
-      }
       
-      double ur = u[esuf[1]] + dot(&du[2*esuf[1]], rr); // reconstruction for right cell
-      if(ur > u_max[esuf[1]])
+      if(esuf[0] < n_cell) // real cell
       {
-         double d2 = ur - u[esuf[1]];
-         double d1 = u_max[esuf[1]] - u[esuf[1]];
-         double phi_temp = (1/d2)*((d1*d1 + er)*d2 + 2*d2*d2*d1)
-                                            /(d1*d1 + 2*d2*d2 + d1*d2 + er);
-         phi[esuf[1]] = min(phi[esuf[1]], phi_temp);
+         double ul = u[esuf[0]] + dot(&du[2*esuf[0]], rl); // reconstruction for left cell
+         if(ul > u_max[esuf[0]])
+         {
+            double d2 = ul - u[esuf[0]];
+            double d1 = u_max[esuf[0]] - u[esuf[0]];
+            double phi_temp = (1/d2)*((d1*d1 + el)*d2 + 2*d2*d2*d1)
+                                               /(d1*d1 + 2*d2*d2 + d1*d2 + el);
+            phi[esuf[0]] = min(phi[esuf[0]], phi_temp);
+         }
+         else if(ul < u_min[esuf[0]])
+         {
+            double d2 = ul - u[esuf[0]];
+            double d1 = u_min[esuf[0]] - u[esuf[0]];
+            double phi_temp = (1/d2)*((d1*d1 + el)*d2 + 2*d2*d2*d1)
+                                               /(d1*d1 + 2*d2*d2 + d1*d2 + el);
+            phi[esuf[0]] = min(phi[esuf[0]], phi_temp);
+         }
       }
-      else if(ur < u_min[esuf[1]])
+
+      if(esuf[1] < n_cell) // real cell
       {
-         double d2 = ur - u[esuf[1]];
-         double d1 = u_min[esuf[1]] - u[esuf[1]];
-         double phi_temp = (1/d2)*((d1*d1 + er)*d2 + 2*d2*d2*d1)
-                                            /(d1*d1 + 2*d2*d2 + d1*d2 + er);
-         phi[esuf[1]] = min(phi[esuf[1]], phi_temp);
+         double ur = u[esuf[1]] + dot(&du[2*esuf[1]], rr); // reconstruction for right cell
+         if(ur > u_max[esuf[1]])
+         {
+            double d2 = ur - u[esuf[1]];
+            double d1 = u_max[esuf[1]] - u[esuf[1]];
+            double phi_temp = (1/d2)*((d1*d1 + er)*d2 + 2*d2*d2*d1)
+                                               /(d1*d1 + 2*d2*d2 + d1*d2 + er);
+            phi[esuf[1]] = min(phi[esuf[1]], phi_temp);
+         }
+         else if(ur < u_min[esuf[1]])
+         {
+            double d2 = ur - u[esuf[1]];
+            double d1 = u_min[esuf[1]] - u[esuf[1]];
+            double phi_temp = (1/d2)*((d1*d1 + er)*d2 + 2*d2*d2*d1)
+                                               /(d1*d1 + 2*d2*d2 + d1*d2 + er);
+            phi[esuf[1]] = min(phi[esuf[1]], phi_temp);
+         }
       }
    }
    
@@ -751,15 +815,14 @@ void read_parameters(Parameters& param, char* param_file)
    file >> dummy >> param.esue_type;
    file >> dummy >> param.order;
    file >> dummy >> param.limiter;
-   file >> dummy >> param.init_cond;
-   file.close();
+   file.close(); 
 }
 
 int main(int argc, char* argv[])
 {
-   assert(argc == 2);
    Parameters param;
    read_parameters(param, argv[1]);
    FVM fvm(param);
    fvm.run();
 }
+

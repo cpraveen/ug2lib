@@ -40,6 +40,8 @@ Grid::~Grid()
    if(!iface_cell)  delete [] iface_cell;
    if(!esue1) delete [] esue1;
    if(!esue2) delete [] esue2;
+   if(!periodicity) delete [] periodicity;
+   if(!prd_node)    delete [] prd_node;
 }
 
 // some utility functions
@@ -95,12 +97,12 @@ void Grid::read_gmsh(const string grid_file)
    file >> n_vertex;
    assert(n_vertex > 0);
    cout << "Number of vertices = " << n_vertex << endl;
-   coord = new double[dim*n_vertex];
+   std::vector<double> coord_tmp(dim*n_vertex); // ghost nodes to be added later
 
    for(unsigned int i=0; i<n_vertex; ++i)
       file >> count
-           >> coord[i*dim]
-           >> coord[i*dim+1]
+           >> coord_tmp[i*dim]
+           >> coord_tmp[i*dim+1]
            >> rdummy; // 2d, dont need z coordinate
 
    // Skip two lines
@@ -177,6 +179,59 @@ void Grid::read_gmsh(const string grid_file)
          exit(0);
       }
    }
+
+   // read data about periodic boundary
+   file >> line
+        >> line;
+   has_periodic = (line == "$Periodic") ? true : false;
+   if(has_periodic)
+   {
+      periodicity = new unsigned int[n_vertex];
+      prd_node = new unsigned int[2*n_vertex]; // maximum 2 nodes can be periodic to a node
+      // Initialize
+      for(unsigned int i=0; i<n_vertex; ++i)
+      {
+         periodicity[i] = 0;
+         prd_node[2*i] = 0;
+         prd_node[2*i+1] = 0;
+      }
+      unsigned int p_ent, p_node;
+      file >> p_ent; // number of periodic entities
+      for(unsigned int i=0; i<p_ent; ++i)
+      {
+         unsigned int dummy;
+         file >> dummy >> dummy >> dummy
+              >> p_node; // number of period nodes per entity
+         for(unsigned int j=0; j<p_node; ++j)
+         {
+            unsigned int node1, node2;
+            file >> node1 >> node2;
+            --node1; // indexing from 0
+            --node2;
+            if(periodicity[node1] == 0)
+            {
+               ++periodicity[node1];
+               prd_node[2*node1] = node2;
+            }
+            else if(periodicity[node1] == 1 && node2 != prd_node[2*node1]) // not already stored
+            {
+               ++periodicity[node1];
+               prd_node[2*node1+1] = node2;
+            }
+            if(periodicity[node2] == 0)
+            {
+               ++periodicity[node2];
+               prd_node[2*node2] = node1;
+            }
+            else if(periodicity[node2] == 1 && node1 != prd_node[2*node2]) // not already stored
+            {
+               ++periodicity[node2];
+               prd_node[2*node2+1] = node1;
+            }
+         }
+      }
+   }
+
    file.close();
 
    n_cell = n_tri + n_quad;
@@ -185,6 +240,7 @@ void Grid::read_gmsh(const string grid_file)
    cout << "Number of triangles       = " << n_tri << endl;
    cout << "Number of quadrilaterals  = " << n_quad << endl;
    cout << "Total number of cells     = " << n_cell << endl;
+   cout << "Periodic boundary ... " << (has_periodic ? "true" : "false") << endl;
 
    assert(n_cell > 0);
    assert(n_bface > 0);
@@ -194,11 +250,231 @@ void Grid::read_gmsh(const string grid_file)
    for(unsigned int i=0; i<elem1[n_elem]; ++i)
       --elem2[i];
 
-   cell1 = new unsigned int[3*n_tri + 4*n_quad];
-   cell2 = new unsigned int[n_cell+1];
-   bface = new unsigned int[2*n_bface];
-   bface_type = new int[n_bface];
-   ctype = new int[n_cell];
+   // create ghost cells for periodic boundary
+   n_ghost_cell = 0;
+   n_ghost_vertex = 0;
+   std::vector<double> ghost_coord; // store translated coordinates of newly added ghost vertices
+   if(has_periodic)
+   {
+      std::vector<unsigned int> ghost_cell_tmp, ghost_vertex_tmp; // to enable resize
+      // vertex_ghost: to keep track of ghost vertex assigned to a real vertex
+      // contain three ghost nodes for each real node in x, y, and diagonal direction
+      std::vector<unsigned int> vertex_ghost(3*n_vertex);
+      for(unsigned int i=n_bface; i<n_elem; ++i) // loop over cells
+      {
+         bool is_periodic1 = false; // single periodicity (one ghost to be created)
+         bool is_periodic2 = false; // double periodicity (three ghosts to be created)
+         double trans[2]; // translation vector for ghost nodes
+         trans[0] = 0.0;
+         trans[1] = 0.0;
+         for(unsigned int j=elem1[i]; j<elem1[i+1]; ++j) // loop over cell vertices
+         {
+            if(periodicity[elem2[j]] == 1) // cell has a single periodicity node
+            {
+               is_periodic1 = true;
+               trans[0] = coord_tmp[2*prd_node[2*elem2[j]]] - coord_tmp[2*elem2[j]];
+               trans[1] = coord_tmp[2*prd_node[2*elem2[j]]+1] - coord_tmp[2*elem2[j]+1];
+            }
+            if(periodicity[elem2[j]] == 2) // cell has a double periodicity node
+            {
+               is_periodic2 = true;
+               is_periodic1 = false;
+               break;
+            }
+         }
+         if(is_periodic1) // add one ghost cell
+         {
+            // store new translation vector if a node has periodic node in the other direction
+            double trans_new[2];
+            trans_new[0] = trans[0];
+            trans_new[1] = trans[1];
+            for(unsigned int p=0; p<2; ++p) // maximum two ghosts for cell with single periodicity
+            {
+               ++n_ghost_cell;
+               ghost_cell_tmp.push_back(i - n_bface); // cell number starts at 0
+               elem1.push_back(elem1[elem1.size()-1] + elem1[i+1] - elem1[i]);
+               elem2.resize(elem2.size() + elem1[i+1] - elem1[i]);
+               unsigned int counter = 0;
+               trans[0] = trans_new[0];
+               trans[1] = trans_new[1];
+               // store vertices to ghost cell
+               for(unsigned int j=elem1[i]; j<elem1[i+1]; ++j)
+               {
+                  double coord_real = coord_tmp[2*elem2[j]]; // real node x-coordinate
+                  double coord_prd = coord_tmp[2*prd_node[2*elem2[j]]]; // its periodic node
+                  // check if periodic node corresponds to same translation direction
+                  if(periodicity[elem2[j]] > 0 && abs(trans[0] - (coord_prd - coord_real)) < 1.0e-14) // periodic node
+                  {
+                     // store periodic counterpart of the node
+                     elem2[elem1[elem1.size()-2]+counter] = prd_node[2*elem2[j]];
+                     ++counter;
+                  }
+                  // ghost node already assigned for x-translation
+                  else if(abs(trans[1]) < 1.0e-14 && vertex_ghost[2*elem2[j]] != 0)
+                  {
+                     elem2[elem1[elem1.size()-2]+counter] = vertex_ghost[2*elem2[j]];
+                     ++counter;
+                  }
+                  // ghost node already assigned for y-translation
+                  else if(abs(trans[0]) < 1.0e-14 && vertex_ghost[2*elem2[j]+1] != 0)
+                  {
+                     elem2[elem1[elem1.size()-2]+counter] = vertex_ghost[2*elem2[j]+1];
+                     ++counter;
+                  }
+                  else // add a new ghost node
+                  {
+                     ghost_vertex_tmp.push_back(elem2[j]); // map to real node
+                     // store the new ghost node as vertex of ghost cell
+                     elem2[elem1[elem1.size()-2]+counter] = n_vertex + n_ghost_vertex;
+                     if(abs(trans[1]) < 1.0e-14) // translation in x-direction
+                        vertex_ghost[2*elem2[j]] = n_vertex + n_ghost_vertex;
+                     if(abs(trans[0]) < 1.0e-14) // translation in y-direction
+                        vertex_ghost[2*elem2[j]+1] = n_vertex + n_ghost_vertex;
+                     ghost_coord.push_back(coord_tmp[2*elem2[j]] + trans[0]); // x-coordinate
+                     ghost_coord.push_back(coord_tmp[2*elem2[j]+1] + trans[1]); // y-coordinate
+                     ++n_ghost_vertex;
+                     ++counter;
+                  }
+                  // check if the node is periodic in the other direction
+                  if(periodicity[elem2[j]] > 0
+                     && abs(trans[0] - (coord_tmp[2*prd_node[2*elem2[j]]] - coord_tmp[2*elem2[j]])) > 1.0e-14)
+                     // I have used e-14 instead of equality because these may not be exactly equal some times
+                  {
+                     trans_new[0] = coord_tmp[2*prd_node[2*elem2[j]]] - coord_tmp[2*elem2[j]];
+                     trans_new[1] = coord_tmp[2*prd_node[2*elem2[j]]+1] - coord_tmp[2*elem2[j]+1];
+                  }
+               }
+               // if no node periodic in the other direction is found, break the loop
+               if(abs(trans_new[0] - trans[0]) < 1.0e-14 && abs(trans_new[1] - trans[1]) < 1.0e-14)
+                  break;
+            }
+         }
+         else if(is_periodic2) // add three ghost cells
+         {
+            unsigned int r_node = n_vertex; // real node in the cell with double periodicity
+            for(unsigned int j=elem1[i]; j<elem1[i+1]; ++j) // loop over cell vertices to get r_node
+            {
+               if(periodicity[elem2[j]] == 2)
+                  r_node = elem2[j];
+            }
+            // loop over vertices and add ghost if periodicity of a node is 2
+            for(unsigned int v=0; v<n_vertex; ++v)
+            {
+               if(periodicity[v] == 2 && v != r_node) // add a ghost cell
+               {
+                  ++n_ghost_cell;
+                  ghost_cell_tmp.push_back(i-n_bface);
+                  elem1.push_back(elem1[elem1.size()-1] + elem1[i+1] - elem1[i]);
+                  elem2.resize(elem2.size() + elem1[i+1] - elem1[i]);
+                  unsigned int counter = 0;
+                  trans[0] = coord_tmp[2*v] - coord_tmp[2*r_node];
+                  trans[1] = coord_tmp[2*v+1] - coord_tmp[2*r_node+1];
+                  // store vertices to ghost cell
+                  for(unsigned int j=elem1[i]; j<elem1[i+1]; ++j)
+                  {
+                     double coord_real = coord_tmp[2*elem2[j]]; // real node x-coordinate
+                     double coord_prd = coord_tmp[2*prd_node[2*elem2[j]]]; // its periodic node
+                     if(elem2[j] == r_node)
+                     {
+                        // store the corresponding periodic node
+                        elem2[elem1[elem1.size()-2]+counter] = v;
+                        ++counter;
+                     }
+                     // periodic node which is not r_node and non-diagonal translation
+                     else if(periodicity[elem2[j]] == 1 && abs(trans[0] - (coord_prd - coord_real)) < 1.0e-14
+                             && (abs(trans[0]) < 1.0e-14 || abs(trans[1]) < 1.0e-14)) // periodic node
+                     {
+                        // store periodic counterpart of the node
+                        elem2[elem1[elem1.size()-2]+counter] = prd_node[2*elem2[j]];
+                        ++counter;
+                     }
+                     // ghost node already assigned for x-translation
+                     else if(abs(trans[1]) < 1.0e-14 && vertex_ghost[2*elem2[j]] != 0)
+                     {
+                        elem2[elem1[elem1.size()-2]+counter] = vertex_ghost[2*elem2[j]];
+                        ++counter;
+                     }
+                     // ghost node already assigned for y-translation
+                     else if(abs(trans[0]) < 1.0e-14 && vertex_ghost[2*elem2[j]+1] != 0)
+                     {
+                        elem2[elem1[elem1.size()-2]+counter] = vertex_ghost[2*elem2[j]+1];
+                        ++counter;
+                     }
+                     // diagonal translation (diagonally opposite corner node)
+                     else if(abs(trans[0]) > 1.0e-14 && abs(trans[1]) > 1.0e-14
+                             && abs(coord_tmp[2*elem2[j]+1] - coord_tmp[2*r_node+1]) < 1.0e-14
+                             && vertex_ghost[2*prd_node[2*elem2[j]]] != 0)
+                     {
+                        elem2[elem1[elem1.size()-2]+counter] = vertex_ghost[2*prd_node[2*elem2[j]]];
+                        ++counter;
+                     }
+                     else if(abs(trans[0]) > 1.0e-14 && abs(trans[1]) > 1.0e-14
+                             && abs(coord_tmp[2*elem2[j]] - coord_tmp[2*r_node]) < 1.0e-14
+                             && vertex_ghost[2*prd_node[2*elem2[j]]+1] != 0)
+                     {
+                        elem2[elem1[elem1.size()-2]+counter] = vertex_ghost[2*prd_node[2*elem2[j]]+1];
+                        ++counter;
+                     }
+                     else if(abs(trans[0]) > 1.0e-14 && abs(trans[1]) > 1.0e-14
+                             && vertex_ghost[2*n_vertex+elem2[j]] != 0)
+                     {
+                        elem2[elem1[elem1.size()-2]+counter] = vertex_ghost[2*n_vertex+elem2[j]];
+                        ++counter;
+                     }
+                     else // create a new ghost node
+                     {
+                        ghost_vertex_tmp.push_back(elem2[j]); // map to real node
+                        // store the new ghost node as vertex of ghost cell
+                        elem2[elem1[elem1.size()-2]+counter] = n_vertex + n_ghost_vertex;
+                        if(abs(trans[1]) < 1.0e-14) // translation in x-direction
+                           vertex_ghost[2*elem2[j]] = n_vertex + n_ghost_vertex;
+                        else if(abs(trans[0]) < 1.0e-14) // translation in y-direction
+                           vertex_ghost[2*elem2[j]+1] = n_vertex + n_ghost_vertex;
+                        else // diagonal translation
+                        {
+                           if(abs(coord_tmp[2*elem2[j]+1] - coord_tmp[2*r_node+1]) < 1.0e-14)
+                              vertex_ghost[2*prd_node[2*elem2[j]]] = n_vertex + n_ghost_vertex;
+                           else if(abs(coord_tmp[2*elem2[j]] - coord_tmp[2*r_node]) < 1.0e-14)
+                              vertex_ghost[2*prd_node[2*elem2[j]]+1] = n_vertex + n_ghost_vertex;
+                           else
+                              vertex_ghost[2*n_vertex+elem2[j]] = n_vertex + n_ghost_vertex;
+                        }
+                        ghost_coord.push_back(coord_tmp[2*elem2[j]] + trans[0]); // x-coordinate
+                        ghost_coord.push_back(coord_tmp[2*elem2[j]+1] + trans[1]); // y-coordinate
+                        ++n_ghost_vertex;
+                        ++counter;
+                     }
+                  }
+               }
+            }
+         }
+      }
+
+      cout << "Number of ghost cells: " << n_ghost_cell << endl;
+      cout << "Number of ghost vertices: " << n_ghost_vertex << endl;
+
+      // copy data from vectors to arrays
+      ghost_cell = new unsigned int[n_ghost_cell];
+      ghost_vertex = new unsigned int[n_ghost_vertex];
+      for(unsigned int i=0; i<n_ghost_cell; ++i)
+         ghost_cell[i] = ghost_cell_tmp[i];
+      for(unsigned int i=0; i<n_ghost_vertex; ++i)
+         ghost_vertex[i] = ghost_vertex_tmp[i];
+   }
+   n_total_cell = n_cell + n_ghost_cell;
+   n_total_vertex = n_vertex + n_ghost_vertex;
+
+   cell1 = new unsigned int[elem2.size()-2*n_bface];
+   cell2 = new unsigned int[elem1.size()-n_bface];
+   if(!(has_periodic)) // if no periodic boundary
+   {
+      bface = new unsigned int[2*n_bface];
+      bface_type = new int[n_bface];
+   }
+   ctype = new int[elem1.size()-n_bface-1];
+   coord = new double[2*n_total_vertex];
+   std::vector<unsigned int> bface_tmp; // needed for periodic boundary
+   std::vector<int> bface_type_tmp;
 
    cell2[0] = 0;
    unsigned int bface_count = 0;
@@ -206,7 +482,20 @@ void Grid::read_gmsh(const string grid_file)
 
    for(unsigned int i=0; i<n_elem; ++i)
    {
-      if(elem_type[i] == 1) // Line face
+      if(elem_type[i] == 1 && has_periodic)
+      {
+         if(!(periodicity[elem2[elem1[i]]] > 0
+              && periodicity[elem2[elem1[i]+1]] > 0)) // if atleast one node is non-periodic
+         {
+            bface_type_tmp.resize(bface_type_tmp.size()+1);
+            bface_tmp.resize(bface_tmp.size()+2);
+            bface_type_tmp[bface_count] = elem_phy[i];
+            bface_tmp[2*bface_count] = elem2[elem1[i]];
+            bface_tmp[2*bface_count+1] = elem2[elem1[i]+1];
+            ++bface_count;
+         }
+      }
+      else if(elem_type[i] == 1) // Line face
       {
          bface_type[bface_count] = elem_phy[i];
          bface[2*bface_count] = elem2[elem1[i]];
@@ -228,6 +517,41 @@ void Grid::read_gmsh(const string grid_file)
       }
    }
 
+   for(unsigned int i=0; i<n_vertex; ++i)
+   {
+      coord[2*i] = coord_tmp[2*i];
+      coord[2*i+1] = coord_tmp[2*i+1];
+   }
+
+   if(has_periodic)
+   {
+      // copy bface from vector to array
+      bface_type = new int[bface_count];
+      bface = new unsigned int[2*bface_count];
+      for(unsigned int i=0; i<bface_count; ++i)
+      {
+         bface_type[i] = bface_type_tmp[i];
+         bface[2*i] = bface_tmp[2*i];
+         bface[2*i+1] = bface_tmp[2*i+1];
+      }
+      // add ghost cells
+      for(unsigned int i=n_cell; i<n_total_cell; ++i)
+      {
+         cell2[i+1] = cell2[i] + elem1[i+n_bface+1] - elem1[i+n_bface];
+         for(unsigned int j=cell2[i]; j<cell2[i+1]; ++j)
+            cell1[j] = elem2[elem1[n_bface]+j];
+         ctype[i] = -ctype[ghost_cell[i-n_cell]]; // ghost cell
+      }
+      // add ghost vertices
+      for(unsigned int i=n_vertex; i<n_total_vertex; ++i)
+      {
+         coord[2*i] = ghost_coord[2*(i-n_vertex)];
+         coord[2*i+1] = ghost_coord[2*(i-n_vertex)+1];
+      }
+      n_bface = bface_count;
+   }
+   cout << "Number of boundary faces = " << n_bface << endl;
+
    assert(bface_count == n_bface);
    assert(cell_count == n_cell);
 
@@ -236,6 +560,9 @@ void Grid::read_gmsh(const string grid_file)
    elem2.resize(0);
    elem_type.resize(0);
    elem_phy.resize(0);
+   ghost_coord.resize(0);
+   bface_tmp.resize(0);
+   bface_type_tmp.resize(0);
 }
 
 // Write grid in vtk format
@@ -293,6 +620,37 @@ void Grid::write_vtk(const string filename)
    cout << "Wrote " << filename << endl;
 }
 
+// Write msh file (usefull to visualise ghost cells)
+void Grid::write_msh(const string filename)
+{
+   cout << "Writing gmsh file " << filename;
+   ofstream file(filename);
+   // Mesh format data
+   file << "$MeshFormat\n2.2 0 8\n$EndMeshFormat\n";
+   // Node data
+   file << "$Nodes\n" << n_total_vertex << endl;
+   for(unsigned int i=0; i<n_total_vertex; ++i)
+   {
+      auto coord = get_coord(i);
+      file << i+1 << " " << coord[0] << " " << coord[1] << " " << 0 << endl;
+   }
+   file << "$EndNodes\n";
+   // Cell data
+   file << "$Elements\n" << n_total_cell << endl;
+   for(unsigned int i=0; i<n_total_cell; ++i)
+   {
+      auto cell = get_cell_vertices(i);
+      file << i+1 << " " << abs(ctype[i]) << " "
+           << 2 << " " << 0 << " " << 0;
+      for(unsigned int j=0; j<cell.first; ++j)
+         file << " " << cell.second[j]+1;
+      file << endl;
+   }
+   file << "$EndElements";
+   file.close();
+   cout << " ... Done\n";
+}
+
 // Find cells surrounding a point
 // See Lohner: section xxx
 void Grid::construct_esup()
@@ -306,12 +664,13 @@ void Grid::construct_esup()
       esup2[i] = 0;
    }
 
-   for(unsigned int icell=0; icell<n_cell; ++icell) // Loop over all the cells
+   for(unsigned int icell=0; icell<n_total_cell; ++icell) // Loop over all the cells
    {
       auto cell = get_cell_vertices(icell);
       for(unsigned int ipoint=0; ipoint<cell.first; ++ipoint)  //Loop over nodes of the cell
       {
-         ++esup2[cell.second[ipoint]+1]; // Count the cells surrounding the node
+         if(cell.second[ipoint] < n_vertex) // psup created only for real vertices
+            ++esup2[cell.second[ipoint]+1]; // Count the cells surrounding the node
       }
    }
 
@@ -326,15 +685,18 @@ void Grid::construct_esup()
       esup1[i] = 0; // not really required
    }
 
-   for(unsigned int icell=0; icell<n_cell; ++icell)
+   for(unsigned int icell=0; icell<n_total_cell; ++icell)
    {
       auto cell = get_cell_vertices(icell);
       for(unsigned int ipoint=0; ipoint<cell.first; ++ipoint)
       {
          unsigned int gnode = cell.second[ipoint]; // Get the global node number
-         unsigned int istor = esup2[gnode]; // location in esup1 where the element will be stored
-         esup1[istor] = icell;
-         ++esup2[gnode];
+         if(gnode < n_vertex) // only for real nodes
+         {
+            unsigned int istor = esup2[gnode]; // location in esup1 where the element will be stored
+            esup1[istor] = icell;
+            ++esup2[gnode];
+         }
       }
    }
 
@@ -366,15 +728,13 @@ void Grid::construct_psup(const psup_type type)
       cout << "Constructing points surrounding point: edge ... ";
 
    psup2 = new unsigned int[n_vertex+1];
-   unsigned int* lpoin = new unsigned int[n_vertex]; // Help array to avoid duplication from neighbouring cells
+   unsigned int* lpoin = new unsigned int[n_total_vertex]; // Help array to avoid duplication from neighbouring cells
 
    // Initialize
-   for(unsigned int i=0; i<n_vertex; ++i)
-   {
+   for(unsigned int i=0; i<n_vertex+1; ++i)
       psup2[i] = 0;
+   for(unsigned int i=0; i<n_total_vertex; ++i)
       lpoin[i] = 0;
-   }
-   psup2[n_vertex] = 0;
 
    std::vector<unsigned int> psup1_temp(0);  // temporary vector to allow resize function
    unsigned int istor = 0;
@@ -414,6 +774,7 @@ void Grid::construct_psup(const psup_type type)
       }
       psup2[ipoint+1] = istor;
    }
+
    // Copy data from psup1_temp to psup1
    psup1 = new unsigned int[psup2[n_vertex]];
    for(unsigned int i=0; i<psup1_temp.size(); ++i)
@@ -441,7 +802,7 @@ void Grid::construct_iface()
       for(unsigned int jpoint=0; jpoint<psup.first; ++jpoint)  // loop over the surrounding points
       {
          // check if the face is not already defined with a previous ipoint
-         if(ipoint<psup.second[jpoint])
+         if(ipoint<psup.second[jpoint] && psup.second[jpoint]<n_vertex)
          {
             // Get esup for both nodes and take intersection
             // 2 cells => directly connected and interior face,
@@ -465,7 +826,7 @@ void Grid::construct_iface()
                                             cell_node2.begin(), cell_node2.end(), inter.begin());
             unsigned int n_esuf = ls - inter.begin(); // number of faces surrounding the element
 
-            if(n_esuf == 2)   // interior face
+            if(n_esuf == 2 && (ctype[inter[0]] > 0 || ctype[inter[1]] > 0)) // interior face
             {
                unsigned int istor = face_temp.size();
                face_temp.resize(face_temp.size()+2);
@@ -544,7 +905,7 @@ void Grid::construct_esuf()
       }
    }
 
-   //Boundary Faces
+   // Boundary Faces
    bface_cell = new unsigned int[n_bface];   // only 1 neighbouring cell
    for(unsigned int jface=0; jface<n_bface; ++jface)  // loop over all the faces
    {
@@ -569,10 +930,10 @@ void Grid::construct_esuf()
       std::vector<unsigned int> inter(std::min(esup_node1.first, esup_node2.first));
       std::set_intersection(cell_node1.begin(), cell_node1.end(),
                             cell_node2.begin(), cell_node2.end(), inter.begin());
-
       bface_cell[jface] = inter[0];
-      // get the nodes of the first cell (to check the orientation)
-      auto cell = get_cell_vertices(inter[0]);
+
+      // get the nodes of the left cell (to check the orientation)
+      auto cell = get_cell_vertices(bface_cell[jface]);
       auto a = get_coord(node1);
       auto b = get_coord(node2);
       const double* c = 0;
@@ -636,8 +997,8 @@ void Grid::construct_esue(const esue_type type)
 
    if(type == esue_moore)  // Moore neighbours (we construct this similar to psup)
    {
-      unsigned int* lelem = new unsigned int[n_cell]; // help array to avoid duplication
-      for(unsigned int i=0; i<n_cell; ++i)
+      unsigned int* lelem = new unsigned int[n_total_cell]; // help array to avoid duplication
+      for(unsigned int i=0; i<n_total_cell; ++i)
          lelem[i] = 0;  // Initialize lelem
 
       unsigned int istor = 0;
@@ -676,13 +1037,14 @@ void Grid::construct_esue(const esue_type type)
    else if(type == esue_neumann)  // Von-Neumann neighbours (we construct this similar to esup)
    {
       // construct esue2
-      for(unsigned int iface=0; iface<n_iface; ++iface)  // loop over all the faces
+      for(unsigned int iface=0; iface<n_iface; ++iface)  // loop over all the interior faces
       {
          auto face_cell = get_iface_cell(iface); // get the face neighbours
-         ++esue2[face_cell[0]+1];  // add one neighbour to left cell
-         ++esue2[face_cell[1]+1];  // add one neighbour to right cell
+         if(ctype[face_cell[0]] > 0) // real cell
+            ++esue2[face_cell[0]+1];  // add one neighbour to left cell
+         if(ctype[face_cell[1]] > 0)
+            ++esue2[face_cell[1]+1];  // add one neighbour to right cell
       }
-
       for(unsigned int i=1; i<=n_cell; ++i)
       {
          esue2[i] += esue2[i-1];
@@ -692,12 +1054,18 @@ void Grid::construct_esue(const esue_type type)
       for(unsigned int iface=0; iface<n_iface; ++iface)
       {
          auto face_cell = get_iface_cell(iface);      // get the face neighbours
-         unsigned int istor1 = esue2[face_cell[0]];   // left cell
-         unsigned int istor2 = esue2[face_cell[1]];   // right cell
-         esue1[istor1] = face_cell[1]; // store right cell as a neighbour of left cell
-         esue1[istor2] = face_cell[0]; // store left cell as a neighbour of right cell
-         ++esue2[face_cell[0]];
-         ++esue2[face_cell[1]];
+         if(ctype[face_cell[0]] > 0) // real cell
+         {
+            unsigned int istor1 = esue2[face_cell[0]];   // left cell
+            esue1[istor1] = face_cell[1]; // store right cell as a neighbour of left cell
+            ++esue2[face_cell[0]];
+         }
+         if(ctype[face_cell[1]] > 0)
+         {
+            unsigned int istor2 = esue2[face_cell[1]];   // right cell
+            esue1[istor2] = face_cell[0]; // store left cell as a neighbour of right cell
+            ++esue2[face_cell[1]];
+         }
       }
       // reshuffle esue2
       for(unsigned int i=n_cell; i>0; --i)
@@ -709,6 +1077,11 @@ void Grid::construct_esue(const esue_type type)
    }
    else if(type == esue_symmetric) // Symmetric augmentation on neumann neighbours
    {
+      if(has_periodic)
+      {
+         cout << "\nSymmetric augmentation not available for periodic boundary" << endl;
+         exit(0);
+      }
       double theta = 3.0*M_PI/4.0; // range of acceptable symmetric cells
 
       compute_cell_centroid();
@@ -979,8 +1352,8 @@ void Grid::construct_esue(const esue_type type)
 // Compute the area of all cells
 void Grid::compute_cell_area()
 {
-   carea = new double[n_cell];
-   for(unsigned int icell=0; icell<n_cell; ++icell)
+   carea = new double[n_total_cell];
+   for(unsigned int icell=0; icell<n_total_cell; ++icell)
    {
       double area = 0;
       auto cell = get_cell_vertices(icell);
@@ -1032,8 +1405,8 @@ void Grid::compute_face_normal()
 // Compute cell centroid
 void Grid::compute_cell_centroid()
 {
-   cell_centroid = new double[2*n_cell];
-   for(unsigned int icell=0; icell<n_cell; ++icell)
+   cell_centroid = new double[2*n_total_cell];
+   for(unsigned int icell=0; icell<n_total_cell; ++icell)
    {
       double x_centroid = 0;
       double y_centroid = 0;

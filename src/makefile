@@ -12,6 +12,10 @@ VTK_OBJ = $(patsubst %.cc,%.o,$(VTK_SRC))
 INC = $(GRID_INC) $(VTK_INC)
 OBJ = $(GRID_OBJ) $(VTK_OBJ)
 
+ifeq ($(PROBLEM),)
+	PROBLEM = CONT_ROT
+endif
+
 all: main ccfv1 ccfv2
 
 #------------------------------------------------------------------------------
@@ -37,11 +41,13 @@ ccfv1: $(OBJ) ccfv1.o
 	$(CXX) -o ccfv1 ccfv1.o $(OBJ)
 #------------------------------------------------------------------------------
 ccfv2.o: $(INC) ccfv2.cc
-	$(CXX) $(CXXFLAGS) -c ccfv2.cc
+	$(CXX) $(CXXFLAGS) -D$(PROBLEM) -c ccfv2.cc
 
 ccfv2: $(OBJ) ccfv2.o
 	$(CXX) -o ccfv2 ccfv2.o $(OBJ)
 #------------------------------------------------------------------------------
+help:
+	@echo "ccfv2: PROBLEM=CONT_ROT|DISC_ROT|PERIODIC_X|PERIODIC_XY"
 
 clean:
 	rm -rf *.o main

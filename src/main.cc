@@ -1,5 +1,8 @@
 #include "grid.h"
 #include "vtk_writer.h"
+#include <fstream>
+
+using namespace std;
 
 int main()
 {
@@ -12,9 +15,10 @@ int main()
    grid.construct_psup(Grid::psup_edge);
    grid.construct_iface();
    grid.construct_esuf();
-   grid.construct_esue(Grid::esue_neumann);
+   grid.construct_esue(Grid::esue_moore);
    grid.compute_cell_area();
    grid.compute_face_normal();
    grid.compute_cell_centroid();
    grid.compute_face_centroid();
+   grid.write_msh("test_mesh.msh");
 }
