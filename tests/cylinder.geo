@@ -46,4 +46,4 @@ Physical Line(2) = {2,8,17,13}; // outer boundary
 Physical Surface(3) = {1,5,14,10}; 
 
 Geometry.Normals = 100;
-Mesh.MshFileVersion = 2.1;
+Mesh.MshFileVersion = 2.2;

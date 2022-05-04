@@ -15,3 +15,5 @@ Curve Loop(1) = {4, 1, 2, 3};
 Plane Surface(1) = {1};
 Physical Curve(1) = {4, 3, 2, 1};
 Physical Surface(2) = {1};
+
+Mesh.MshFileVersion = 2.2;
