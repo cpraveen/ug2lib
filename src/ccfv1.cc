@@ -223,7 +223,7 @@ void run(Grid& grid, double& l1error, double& l2error)
       update_solution(grid, u, R, dt);
       t += dt; ++iter;
       cout << "iter, t = " << iter << " " << t << endl;
-      if(iter%100 == 0) save_solution(grid, u, t, iter);
+      if(iter%100 == 0 || fabs(t-Tf) < 1.0e-13) save_solution(grid, u, t, iter);
    }
 
    compute_error(grid, u, l1error, l2error);
