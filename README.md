@@ -33,7 +33,7 @@ visit -o cylinder.vtk
 gmsh test_msh.msh
 ```
 
-## Test first order FV code
+## Test first order FV code: `src/ccfv1.cc`
 
 ```
 cd tests
@@ -42,9 +42,9 @@ gmsh -2 square_tri.geo -o ccfv1.msh
 visit -o sol*.vtk
 ```
 
-## Test second order FV code
+## Test second order FV code: `src/ccfv2.cc`
 
-This reads some parameters from an input file, see `tests/input.txt` file.
+This code reads some parameters from an input file, see `tests/input.txt` file.
 
 ## Formatting using astyle
 
@@ -52,6 +52,13 @@ Run astyle on source code before committing it
 ```
 astyle --options=./astyle.rc grid.cc
 ```
+
+## References
+
+To understand the methods used in this code, you can refer to the following two books.
+
+* Rainald Lohner: Applied Computational Fluid Dynamics Techniques
+* Jiri Blazek: Computational Fluid Dynamics
 
 ## Authors
 
