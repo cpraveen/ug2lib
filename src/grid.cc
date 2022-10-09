@@ -46,19 +46,19 @@ Grid::~Grid()
 
 // some utility functions
 // return euclidean distance b/w 2d vectors
-double Grid::distance(const double* a, const double* b)
+double Grid::distance(const double *a, const double *b)
 {
    return sqrt(pow(a[0]-b[0],2) + pow(a[1]-b[1],2));
 }
 
 // return dot product of 2d vectors
-double Grid::dot(const double* a, const double* b)
+double Grid::dot(const double *a, const double *b)
 {
    return a[0]*b[0] + a[1]*b[1];
 }
 
 // Calculates the cross product (ca x cb)
-bool Grid::orient(const double* a, const double* b, const double* c)
+bool Grid::orient(const double *a, const double *b, const double *c)
 {
    double ar = (a[0]-c[0])*(b[1]-c[1]) - (b[0]-c[0])*(a[1]-c[1]);
    if(ar < 0)
@@ -567,7 +567,7 @@ void Grid::read_gmsh(const string grid_file)
 
 // Write grid in vtk format
 // ofstream must be opened before calling this function.
-void Grid::write_vtk(std::ofstream& vtk)
+void Grid::write_vtk(std::ofstream &vtk)
 {
    assert(vtk.is_open());
 
@@ -728,7 +728,7 @@ void Grid::construct_psup(const psup_type type)
       cout << "Constructing points surrounding point: edge ... ";
 
    psup2 = new unsigned int[n_vertex+1];
-   unsigned int* lpoin = new unsigned int[n_total_vertex]; // Help array to avoid duplication from neighbouring cells
+   unsigned int *lpoin = new unsigned int[n_total_vertex]; // Help array to avoid duplication from neighbouring cells
 
    // Initialize
    for(unsigned int i=0; i<n_vertex+1; ++i)
@@ -883,7 +883,7 @@ void Grid::construct_esuf()
       auto cell = get_cell_vertices(inter[0]);
       auto a = get_coord(node1);
       auto b = get_coord(node2);
-      const double* c = 0;
+      const double *c = 0;
       // loop over the nodes of the element and get node c (other than a and b)
       for(unsigned int inode=0; inode<cell.first; ++inode)
       {
@@ -936,7 +936,7 @@ void Grid::construct_esuf()
       auto cell = get_cell_vertices(bface_cell[jface]);
       auto a = get_coord(node1);
       auto b = get_coord(node2);
-      const double* c = 0;
+      const double *c = 0;
       // loop over the nodes of the element and get node c (other than a and b)
       for(unsigned int inode=0; inode<cell.first; ++inode)
       {
@@ -997,7 +997,7 @@ void Grid::construct_esue(const esue_type type)
 
    if(type == esue_moore)  // Moore neighbours (we construct this similar to psup)
    {
-      unsigned int* lelem = new unsigned int[n_total_cell]; // help array to avoid duplication
+      unsigned int *lelem = new unsigned int[n_total_cell]; // help array to avoid duplication
       for(unsigned int i=0; i<n_total_cell; ++i)
          lelem[i] = 0;  // Initialize lelem
 
@@ -1087,7 +1087,7 @@ void Grid::construct_esue(const esue_type type)
       compute_cell_centroid();
       compute_face_centroid();
 
-      unsigned int* symm2 = new unsigned int[n_cell+1];
+      unsigned int *symm2 = new unsigned int[n_cell+1];
       // Initialize symm2
       for(unsigned int i=0; i<n_cell+1; ++i)
          symm2[i] = 0;
@@ -1193,7 +1193,7 @@ void Grid::construct_esue(const esue_type type)
          symm2[i+1] += symm2[i];
 
       // construct symm1
-      unsigned int* symm1 = new unsigned int[symm2[n_cell]];
+      unsigned int *symm1 = new unsigned int[symm2[n_cell]];
       // Interior faces:
       for(unsigned int i=0; i<n_iface; ++i) // loop over interior faces
       {

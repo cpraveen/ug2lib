@@ -6,7 +6,7 @@
 class VTKWriter
 {
 public:
-   VTKWriter(std::string filename, Grid& grid,
+   VTKWriter(std::string filename, Grid &grid,
              double time=0.0, int cycle=0);
    ~VTKWriter();
 
@@ -17,7 +17,7 @@ private:
    void write_grid();
 
    std::string   filename;
-   Grid*         grid;
+   Grid         *grid;
    double        time;
    int           cycle;
    std::ofstream vtk;

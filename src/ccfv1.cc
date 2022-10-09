@@ -7,25 +7,14 @@
 
 using namespace std;
 
-// return euclidean norm of 2d vector
-double norm(const double *a)
-{
-   return sqrt(pow(a[0],2) + pow(a[1],2));
-}
-
-// return euclidean distance b/w 2d vectors
-double distance(const double *a, const double *b)
-{
-   return sqrt(pow(a[0]-b[0],2) + pow(a[1]-b[1],2));
-}
-
 // return dot product of 2d vectors
-double dot(const double*a, const double* b)
+double dot(const double *a, const double *b)
 {
    return a[0]*b[0] + a[1]*b[1];
 }
 
 // advection velocity in linear advection problem
+// velocity = (y, -x)
 void advection_velocity(const double *x, double *v)
 {
    v[0] =  x[1];
@@ -40,7 +29,7 @@ double initial_condition(const double *x)
 }
 
 // compute dt using cfl condition based on maximum principle
-double compute_time_step(Grid& grid)
+double compute_time_step(Grid &grid)
 {
    auto n_cell = grid.get_n_cell();
    vector<double> tmp(n_cell);
@@ -88,7 +77,7 @@ double compute_time_step(Grid& grid)
 
 // upwind flux
 double num_flux(const double ul, const double ur,
-                const double* v, const double* normal)
+                const double *v, const double *normal)
 {
    double vn = dot(v, normal);
    return (vn > 0.0) ? (vn*ul) : (vn*ur);
@@ -96,7 +85,7 @@ double num_flux(const double ul, const double ur,
 
 // compute finite volume residual R in the semi-discrete equation
 // A*du/dt + R = 0, A = cell area
-void compute_residual(Grid& grid, const double* u, double* R)
+void compute_residual(Grid &grid, const double *u, double *R)
 {
    auto n_cell = grid.get_n_cell();
    for(unsigned int i=0; i<n_cell; ++i)
@@ -137,7 +126,7 @@ void compute_residual(Grid& grid, const double* u, double* R)
 }
 
 // update solution using forward euler
-void update_solution(Grid& grid, double* u, const double* R, const double dt)
+void update_solution(Grid &grid, double *u, const double *R, const double dt)
 {
    auto n_cell = grid.get_n_cell();
    for(unsigned int i=0; i<n_cell; ++i)
@@ -145,7 +134,7 @@ void update_solution(Grid& grid, double* u, const double* R, const double dt)
 }
 
 // set initial condition into solution array
-void set_initial_condition(Grid& grid, double* u)
+void set_initial_condition(Grid &grid, double *u)
 {
    auto n_cell = grid.get_n_cell();
    for(unsigned int i=0; i<n_cell; ++i)
@@ -156,7 +145,7 @@ void set_initial_condition(Grid& grid, double* u)
 }
 
 // save solution to file with different name
-void save_solution(Grid& grid, const double* u, double time, int iter)
+void save_solution(Grid &grid, const double *u, double time, int iter)
 {
    static int counter = 0;
    string filename = "sol";
@@ -174,11 +163,13 @@ void save_solution(Grid& grid, const double* u, double time, int iter)
 
    filename += ".vtk";
    VTKWriter writer(filename, grid, time, iter);
-   writer.write_cell_scalar(u,"u");
+   writer.write_cell_scalar(u, "u");
    ++counter;
 }
 
-void compute_error(Grid& grid, const double* u,
+// Compute l1 and l2 error norm at final time. We assume final solution is
+// same as initial solution.
+void compute_error(Grid &grid, const double *u,
                    double &l1error, double &l2error)
 {
    l1error = l2error = 0.0;
@@ -197,7 +188,8 @@ void compute_error(Grid& grid, const double* u,
    l2error = sqrt(l2error/total_area);
 }
 
-void run(Grid& grid, double& l1error, double& l2error)
+// This is where the computations start.
+void run(Grid &grid, double &l1error, double &l2error)
 {
    grid.construct_esuf();
    grid.compute_cell_area();
@@ -206,13 +198,13 @@ void run(Grid& grid, double& l1error, double& l2error)
    grid.compute_face_centroid();
 
    auto n_cell = grid.get_n_cell();
-   double* u = new double[n_cell];
+   double *u = new double[n_cell];
 
    // Set initial condition
    set_initial_condition(grid, u);
 
    double dt = compute_time_step(grid);
-   double* R = new double[n_cell];
+   double *R = new double[n_cell];
    double t = 0.0, Tf = 2.0*M_PI;
    unsigned int iter = 0;
    save_solution(grid, u, t, iter);
@@ -221,7 +213,8 @@ void run(Grid& grid, double& l1error, double& l2error)
       if(t+dt > Tf) dt = Tf - t;
       compute_residual(grid, u, R);
       update_solution(grid, u, R, dt);
-      t += dt; ++iter;
+      t += dt;
+      ++iter;
       cout << "iter, t = " << iter << " " << t << endl;
       if(iter%100 == 0 || fabs(t-Tf) < 1.0e-13) save_solution(grid, u, t, iter);
    }

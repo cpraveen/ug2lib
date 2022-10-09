@@ -49,8 +49,15 @@ This code reads some parameters from an input file, see `tests/input.txt` file.
 ## Formatting using astyle
 
 Run astyle on source code before committing it
+
 ```
 astyle --options=./astyle.rc grid.cc
+```
+
+or
+
+```
+sh ./astyle.sh
 ```
 
 ## References

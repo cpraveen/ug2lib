@@ -3,12 +3,12 @@
 using namespace std;
 
 // constructor
-VTKWriter::VTKWriter(string filename, Grid& grid, double time, int cycle)
-:
-filename (filename),
-grid (&grid),
-time (time),
-cycle (cycle)
+VTKWriter::VTKWriter(string filename, Grid &grid, double time, int cycle)
+   :
+   filename(filename),
+   grid(&grid),
+   time(time),
+   cycle(cycle)
 {
    vtk.open(filename);
    assert(vtk.is_open());
@@ -78,7 +78,7 @@ void VTKWriter::write_cell_scalar(const double *data, string name)
    vtk << "CELL_DATA " << n_cell << endl;
    vtk << "SCALARS " << name << " double 1\n";
    vtk << "LOOKUP_TABLE default\n";
-   for (unsigned int i=0; i<n_cell; ++i)
+   for(unsigned int i=0; i<n_cell; ++i)
       vtk << data[i] << endl;
 }
 

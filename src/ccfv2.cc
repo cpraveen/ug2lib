@@ -11,38 +11,38 @@
 using namespace std;
 
 // return euclidean norm of 2d vector
-double norm(const double* a)
+double norm(const double *a)
 {
    return sqrt(pow(a[0],2) + pow(a[1],2));
 }
 
 // return euclidean distance b/w 2d vectors
-double distance(const double* a, const double* b)
+double distance(const double *a, const double *b)
 {
    return sqrt(pow(a[0]-b[0],2) + pow(a[1]-b[1],2));
 }
 
 // return dot product of 2d vectors
-double dot(const double* a, const double* b)
+double dot(const double *a, const double *b)
 {
    return a[0]*b[0] + a[1]*b[1];
 }
 
 // Set advection speed as per the test case
 #if defined(CONT_ROT) || defined(DISC_ROT)
-void advection_velocity(const double* x, double* v)
+void advection_velocity(const double *x, double *v)
 {
    v[0] =  x[1];
    v[1] = -x[0];
 }
 #elif defined(PERIODIC_X)
-void advection_velocity(const double* x, double* v)
+void advection_velocity(const double *x, double *v)
 {
    v[0] =  0.5;
    v[1] =  0;
 }
 #elif defined(PERIODIC_XY)
-void advection_velocity(const double* x, double* v)
+void advection_velocity(const double *x, double *v)
 {
    v[0] =  0.5;
    v[1] =  0.5;
@@ -51,13 +51,13 @@ void advection_velocity(const double* x, double* v)
 
 // set initial condition as per the test case
 #if defined(CONT_ROT) // smooth initial condition, centered at (0.5, 0)
-double initial_condition(const double* x)
+double initial_condition(const double *x)
 {
    double r2 = pow(x[0]-0.5,2) + pow(x[1],2);
    return exp(-50.0*r2);
 }
 #elif defined(DISC_ROT) // discontinuous initial condition
-double initial_condition(const double* x)
+double initial_condition(const double *x)
 {
    if((x[0] >= 0.25 && x[0] <= 0.75)
       && (x[1] >= -0.25 && x[1] <= 0.25)) // square
@@ -66,7 +66,7 @@ double initial_condition(const double* x)
       return 0;
 }
 #elif defined(PERIODIC_X) || defined(PERIODIC_XY) // smooth, centered at (0, 0)
-double initial_condition(const double* x)
+double initial_condition(const double *x)
 {
    double r2 = pow(x[0],2) + pow(x[1],2);
    return exp(-50.0*r2);
@@ -75,7 +75,7 @@ double initial_condition(const double* x)
 
 // upwind flux
 double num_flux(const double ul, const double ur,
-                const double* v, const double* normal)
+                const double *v, const double *normal)
 {
    double vn = dot(v, normal);
    return (vn > 0.0) ? (vn*ul) : (vn*ur);
@@ -95,7 +95,7 @@ struct Parameters
 class FVM
 {
 public:
-   FVM(Parameters& param);
+   FVM(Parameters &param);
    ~FVM();
    void run();
 
@@ -118,13 +118,13 @@ private:
    void update_ghost_solution();
    void update_ghost_gradient();
 
-   Parameters*  param;
+   Parameters  *param;
    Grid         grid;
-   double*      uold; // solution at time level n
-   double*      u;    // solution at time level n+1
-   double*      res;  // residual
-   double*      du;   // gradient of u
-   double*      lscoef; // coefficients for least squares
+   double      *uold; // solution at time level n
+   double      *u;    // solution at time level n+1
+   double      *res;  // residual
+   double      *du;   // gradient of u
+   double      *lscoef; // coefficients for least squares
    double       *u_min, *u_max, *phi; // for limiter
 
    double       t, dt;
@@ -133,7 +133,7 @@ private:
 };
 
 // constructor
-FVM::FVM(Parameters& param)
+FVM::FVM(Parameters &param)
    :
    param(&param)
 {
@@ -166,7 +166,7 @@ void FVM::read_grid_and_preprocess()
       grid.construct_esue(Grid::esue_symmetric);
    else
    {
-      cout << "Invalid esue_type =" << param->esue_type 
+      cout << "Invalid esue_type =" << param->esue_type
            << ", options: moore/neumann/symmetric\n";
       exit(0);
    }
@@ -271,9 +271,9 @@ void FVM::compute_lscoef()
       auto esue = grid.get_esue(i); // get surrounding cells
       auto cent_i = grid.get_cell_centroid(i);
       double a11 = 0, a12 = 0, a22 = 0; // elements of A matrix
-      double* w = new double[esue.first]; // weights matrix W (1/r_ij)
-      double* dx = new double[esue.first];
-      double* dy = new double[esue.first]; // D matrix
+      double *w = new double[esue.first]; // weights matrix W (1/r_ij)
+      double *dx = new double[esue.first];
+      double *dy = new double[esue.first]; // D matrix
 
       // compute the elements of A, W and D matrix
       for(unsigned int j=0; j<esue.first; ++j)
@@ -693,7 +693,7 @@ void FVM::apply_venkat_limiter()
       rl[1] = xf[1] - xl[1];
       rr[0] = xf[0] - xr[0];
       rr[1] = xf[1] - xr[1];
-      
+
       if(esuf[0] < n_cell) // real cell
       {
          double ul = u[esuf[0]] + dot(&du[2*esuf[0]], rl); // reconstruction for left cell
@@ -702,7 +702,7 @@ void FVM::apply_venkat_limiter()
             double d2 = ul - u[esuf[0]];
             double d1 = u_max[esuf[0]] - u[esuf[0]];
             double phi_temp = (1/d2)*((d1*d1 + el)*d2 + 2*d2*d2*d1)
-                                               /(d1*d1 + 2*d2*d2 + d1*d2 + el);
+                              /(d1*d1 + 2*d2*d2 + d1*d2 + el);
             phi[esuf[0]] = min(phi[esuf[0]], phi_temp);
          }
          else if(ul < u_min[esuf[0]])
@@ -710,7 +710,7 @@ void FVM::apply_venkat_limiter()
             double d2 = ul - u[esuf[0]];
             double d1 = u_min[esuf[0]] - u[esuf[0]];
             double phi_temp = (1/d2)*((d1*d1 + el)*d2 + 2*d2*d2*d1)
-                                               /(d1*d1 + 2*d2*d2 + d1*d2 + el);
+                              /(d1*d1 + 2*d2*d2 + d1*d2 + el);
             phi[esuf[0]] = min(phi[esuf[0]], phi_temp);
          }
       }
@@ -723,7 +723,7 @@ void FVM::apply_venkat_limiter()
             double d2 = ur - u[esuf[1]];
             double d1 = u_max[esuf[1]] - u[esuf[1]];
             double phi_temp = (1/d2)*((d1*d1 + er)*d2 + 2*d2*d2*d1)
-                                               /(d1*d1 + 2*d2*d2 + d1*d2 + er);
+                              /(d1*d1 + 2*d2*d2 + d1*d2 + er);
             phi[esuf[1]] = min(phi[esuf[1]], phi_temp);
          }
          else if(ur < u_min[esuf[1]])
@@ -731,12 +731,12 @@ void FVM::apply_venkat_limiter()
             double d2 = ur - u[esuf[1]];
             double d1 = u_min[esuf[1]] - u[esuf[1]];
             double phi_temp = (1/d2)*((d1*d1 + er)*d2 + 2*d2*d2*d1)
-                                               /(d1*d1 + 2*d2*d2 + d1*d2 + er);
+                              /(d1*d1 + 2*d2*d2 + d1*d2 + er);
             phi[esuf[1]] = min(phi[esuf[1]], phi_temp);
          }
       }
    }
-   
+
    // Boundary faces:
    auto n_bface = grid.get_n_bface();
    for(unsigned int i=0; i<n_bface; ++i)
@@ -755,7 +755,7 @@ void FVM::apply_venkat_limiter()
          double d2 = ul - u[esuf];
          double d1 = u_max[esuf] - u[esuf];
          double phi_temp = (1/d2)*((d1*d1 + el)*d2 + 2*d2*d2*d1)
-                                            /(d1*d1 + 2*d2*d2 + d1*d2 + el);
+                           /(d1*d1 + 2*d2*d2 + d1*d2 + el);
          phi[esuf] = min(phi[esuf], phi_temp);
       }
       else if(ul < u_min[esuf])
@@ -763,7 +763,7 @@ void FVM::apply_venkat_limiter()
          double d2 = ul - u[esuf];
          double d1 = u_min[esuf] - u[esuf];
          double phi_temp = (1/d2)*((d1*d1 + el)*d2 + 2*d2*d2*d1)
-                                            /(d1*d1 + 2*d2*d2 + d1*d2 + el);
+                           /(d1*d1 + 2*d2*d2 + d1*d2 + el);
          phi[esuf] = min(phi[esuf], phi_temp);
       }
    }
@@ -804,7 +804,7 @@ void FVM::run()
    compute_error();
 }
 
-void read_parameters(Parameters& param, char* param_file)
+void read_parameters(Parameters &param, char *param_file)
 {
    ifstream file(param_file);
    assert(file.is_open());
@@ -815,10 +815,10 @@ void read_parameters(Parameters& param, char* param_file)
    file >> dummy >> param.esue_type;
    file >> dummy >> param.order;
    file >> dummy >> param.limiter;
-   file.close(); 
+   file.close();
 }
 
-int main(int argc, char* argv[])
+int main(int argc, char *argv[])
 {
    Parameters param;
    read_parameters(param, argv[1]);

@@ -15,8 +15,8 @@
 --unpad-paren
 
 # write things as 'char *p'
---align-pointer=type
---align-reference=type
+--align-pointer=name
+--align-reference=name
 
 --max-instatement-indent=60
 --suffix=none

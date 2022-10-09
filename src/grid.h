@@ -29,7 +29,7 @@ public:
    Grid();
    ~Grid();
    void read_gmsh(const std::string grid_file);
-   void write_vtk(std::ofstream& vtk);
+   void write_vtk(std::ofstream &vtk);
    void write_vtk(const std::string filename);
    void write_msh(const std::string filename);
    void construct_esup();
@@ -82,7 +82,7 @@ public:
       return n_iface;
    }
 
-   inline const double* get_coord(unsigned int i)
+   inline const double *get_coord(unsigned int i)
    {
       return &coord[i*dim];
    }
@@ -92,79 +92,79 @@ public:
       return ctype[i];
    }
 
-   inline const double& get_cell_area(unsigned int i)
+   inline const double &get_cell_area(unsigned int i)
    {
       return carea[i];
    }
 
-   inline const double* get_cell_centroid(unsigned int i)
+   inline const double *get_cell_centroid(unsigned int i)
    {
       return &cell_centroid[2*i];
    }
 
    // We are assuming linear edge
-   inline const unsigned int* get_iface_vertices(unsigned int i)
+   inline const unsigned int *get_iface_vertices(unsigned int i)
    {
       return &iface[2*i];
    }
 
-   inline const double& get_iface_length(unsigned int i)
+   inline const double &get_iface_length(unsigned int i)
    {
       return iface_len[i];
    }
 
-   inline const double* get_iface_normal(unsigned int i)
+   inline const double *get_iface_normal(unsigned int i)
    {
       return &iface_norm[i*dim];
    }
 
-   inline const double* get_iface_centroid(unsigned int i)
+   inline const double *get_iface_centroid(unsigned int i)
    {
       return &iface_centroid[2*i];
    }
 
-   inline const double* get_bface_centroid(unsigned int i)
+   inline const double *get_bface_centroid(unsigned int i)
    {
       return &bface_centroid[2*i];
    }
 
-   inline const double* get_bface_normal(unsigned int i)
+   inline const double *get_bface_normal(unsigned int i)
    {
       return &bface_norm[i*dim];
    }
 
-   inline const unsigned int* get_bface_vertices(unsigned int i)
+   inline const unsigned int *get_bface_vertices(unsigned int i)
    {
       return &bface[2*i];
    }
 
-   inline const double& get_bface_length(unsigned int i)
+   inline const double &get_bface_length(unsigned int i)
    {
       return bface_len[i];
    }
 
-   inline std::pair<unsigned int,const unsigned int*> get_cell_vertices(unsigned int i)
+   inline std::pair<unsigned int,const unsigned int *> get_cell_vertices(unsigned int i)
    {
       unsigned int start = cell2[i];
       unsigned int end = cell2[i+1];
       return std::make_pair(end-start,&cell1[start]);
    }
 
-   inline std::pair<unsigned int,const unsigned int*> get_esup(unsigned int i)
+   inline std::pair<unsigned int,const unsigned int *> get_esup(unsigned int i)
    {
       unsigned int start = esup2[i];
       unsigned int end = esup2[i+1];
       return std::make_pair(end-start,&esup1[start]);
    }
 
-   inline std::pair<unsigned int,const unsigned int*> get_psup(unsigned int i)
+   inline std::pair<unsigned int,const unsigned int *> get_psup(unsigned int i)
    {
       unsigned int start = psup2[i];
       unsigned int end = psup2[i+1];
       return std::make_pair(end-start,&psup1[start]);
    }
 
-   inline std::pair<unsigned int,const unsigned int*> get_esue(unsigned int i)
+   inline std::pair<unsigned int,const unsigned int *> get_esue(unsigned int i)
    {
       unsigned int start = esue2[i];
       unsigned int end = esue2[i+1];
@@ -176,7 +176,7 @@ public:
       return std::make_pair(esue2[i],esue2[i+1]);
    }
 
-   inline const unsigned int* get_iface_cell(unsigned int i)
+   inline const unsigned int *get_iface_cell(unsigned int i)
    {
       return &iface_cell[2*i];
    }
@@ -229,39 +229,39 @@ private:
    const int     dim = 2;
    unsigned int  n_vertex, n_cell, n_tri, n_quad, n_bface, n_iface;
    unsigned int  n_ghost_cell, n_ghost_vertex, n_total_cell, n_total_vertex;
-   double*       coord;
+   double       *coord;
 
    // cell data
-   unsigned int* cell1, *cell2;
-   int*          ctype;
-   double*       carea;
-   double*       cell_centroid;  //centroid of the cells
+   unsigned int *cell1, *cell2;
+   int          *ctype;
+   double       *carea;
+   double       *cell_centroid;  //centroid of the cells
 
    // connectivity information
-   unsigned int* esup1, *esup2;
-   unsigned int* psup1, *psup2;
-   unsigned int* esue1, *esue2;
+   unsigned int *esup1, *esup2;
+   unsigned int *psup1, *psup2;
+   unsigned int *esue1, *esue2;
 
    // boundary face data
-   unsigned int* bface;      // vertices forming the face
-   unsigned int* bface_cell; // cell adjacent to boundary face
-   int*          bface_type; // type read from grid file, used for bc
-   double*       bface_norm; // unit outward normal
-   double*       bface_len;  // length of face
-   double*       bface_centroid; //centroid of bface
+   unsigned int *bface;      // vertices forming the face
+   unsigned int *bface_cell; // cell adjacent to boundary face
+   int          *bface_type; // type read from grid file, used for bc
+   double       *bface_norm; // unit outward normal
+   double       *bface_len;  // length of face
+   double       *bface_centroid; //centroid of bface
 
    // Interior faces
-   double*       iface_len;  // length of face
-   unsigned int* iface;      // vertex numbers for each face
-   double*       iface_norm; // unit normal to face
-   unsigned int* iface_cell; // cells adjacent to face
-   double*       iface_centroid; //centroid of iface
+   double       *iface_len;  // length of face
+   unsigned int *iface;      // vertex numbers for each face
+   double       *iface_norm; // unit normal to face
+   unsigned int *iface_cell; // cells adjacent to face
+   double       *iface_centroid; //centroid of iface
 
    // Periodic boundary data
-   unsigned int* periodicity;  // periodicity of nodes (0, 1, 2)
-   unsigned int* prd_node;     // map of periodic nodes
-   unsigned int* ghost_cell;   // map of ghost and real cells
-   unsigned int* ghost_vertex; // map of ghost and real vertices
+   unsigned int *periodicity;  // periodicity of nodes (0, 1, 2)
+   unsigned int *prd_node;     // map of periodic nodes
+   unsigned int *ghost_cell;   // map of ghost and real cells
+   unsigned int *ghost_vertex; // map of ghost and real vertices
 
    bool         has_esup;
    bool         has_psup_all;
@@ -273,9 +273,9 @@ private:
    bool         has_esue_symmetric;
    bool         has_periodic;
 
-   static double distance(const double* a, const double* b);
-   static double dot(const double* a, const double* b);
-   static bool orient(const double* a, const double* b, const double* c);
+   static double distance(const double *a, const double *b);
+   static double dot(const double *a, const double *b);
+   static bool orient(const double *a, const double *b, const double *c);
 };
 
 void grid_test1(); // Function to dump the constructed data (for reference mesh)
