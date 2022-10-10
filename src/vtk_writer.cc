@@ -1,3 +1,4 @@
+#include <cassert>
 #include "vtk_writer.h"
 
 using namespace std;
