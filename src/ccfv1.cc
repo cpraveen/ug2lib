@@ -126,6 +126,7 @@ void compute_residual(Grid &grid, const double *u, double *R)
 }
 
 // update solution using forward euler
+// A*du/dt + R = 0, A = cell area
 void update_solution(Grid &grid, double *u, const double *R, const double dt)
 {
    auto n_cell = grid.get_n_cell();

@@ -44,7 +44,14 @@ visit -o sol*.vtk
 
 ## Test second order FV code: `src/ccfv2.cc`
 
-This code reads some parameters from an input file, see `tests/input.txt` file.
+This code reads some parameters from an input file, see `tests/input.txt` file. Several problems are defined in the code, compile them like this
+
+```
+make ccfv2 PROBLEM=CONT_ROT
+make ccfv2 PROBLEM=DISC_ROT
+make ccfv2 PROBLEM=PERIODIC_X
+make ccfv2 PROBLEM=PERIODIC_XY
+```
 
 ## Formatting using astyle
 

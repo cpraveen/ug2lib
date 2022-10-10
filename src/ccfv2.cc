@@ -85,9 +85,9 @@ struct Parameters
 {
    string grid_file;
    double tfinal;
-   int save_freq;
+   int    save_freq;
    string esue_type;
-   int order;
+   int    order;
    string limiter;
 };
 
@@ -320,15 +320,16 @@ void FVM::compute_gradient()
 
    for(unsigned int i=0; i<n_cell; ++i)
    {
-      du[2*i] = du[2*i+1] = 0; // Initialize
+      du[2*i]   = 0; // u_x
+      du[2*i+1] = 0; // u_y
       auto esue = grid.get_esue(i); // get surrounding cells
       auto range = grid.get_esue_range(i);
       for(unsigned int j=0; j<esue.first; ++j)
       {
          unsigned int k = 2*(range.first + j); // location in lscoef
          double dU = u[esue.second[j]] - u[i];
-         du[2*i]   += lscoef[k]*dU;   // u_x
-         du[2*i+1] += lscoef[k+1]*dU; // u_y
+         du[2*i]   += lscoef[k  ]*dU;   // u_x
+         du[2*i+1] += lscoef[k+1]*dU;   // u_y
       }
    }
 }
@@ -493,7 +494,7 @@ void FVM::compute_error()
 // find minimum and maximum value of u in the domain
 void FVM::compute_minmax()
 {
-   umin = 1.0e14;
+   umin =  1.0e14;
    umax = -1.0e14;
    auto n_cell = grid.get_n_cell();
    for(unsigned int i=0; i<n_cell; ++i)
@@ -825,4 +826,3 @@ int main(int argc, char *argv[])
    FVM fvm(param);
    fvm.run();
 }
-
