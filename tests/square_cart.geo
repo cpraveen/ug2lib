@@ -16,5 +16,8 @@ Plane Surface(1) = {1};
 Physical Curve(1) = {4, 3, 2, 1};
 Physical Surface(2) = {1};
 
+// Periodic Curve{2} = {-4}; // periodic along x
+// Periodic Curve{3} = {-1}; // periodic along y
+
 Recombine Surface {1};
 Transfinite Surface {1};

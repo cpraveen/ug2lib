@@ -20,6 +20,9 @@ Plane Surface(2) = {2};
 Transfinite Curve {4, 1, 2, 3} = n Using Progression 1;
 Transfinite Curve {5} = n*1.5 Using Progression 1;
 
+// Periodic Curve{2} = {-4}; // periodic along x
+// Periodic Curve{3} = {-1}; // periodic along y
+
 Physical Curve(1) = {4, 3, 2, 1};
 Physical Surface(2) = {1, 2};
 Recombine Surface {2};

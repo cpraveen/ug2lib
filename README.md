@@ -22,7 +22,7 @@ gmsh -2 -format msh22 foo.geo -o foo.msh
 cd src
 make
 cd ../tests
-gmsh -2 cylinder.geo
+gmsh -2 -format msh22 cylinder.geo
 ../src/main
 ```
 
@@ -37,7 +37,7 @@ gmsh test_msh.msh
 
 ```
 cd tests
-gmsh -2 square_tri.geo -o ccfv1.msh
+gmsh -2 -format msh22 square_tri.geo -o ccfv1.msh
 ../src/ccfv1
 visit -o sol*.vtk
 ```
@@ -49,8 +49,8 @@ This code reads some parameters from an input file, see `tests/input.txt` file. 
 ```
 make ccfv2 PROBLEM=CONT_ROT
 make ccfv2 PROBLEM=DISC_ROT
-make ccfv2 PROBLEM=PERIODIC_X
-make ccfv2 PROBLEM=PERIODIC_XY
+make ccfv2 PROBLEM=PERIODIC_X   # enable periodic in geo file
+make ccfv2 PROBLEM=PERIODIC_XY  # enable periodic in geo file
 ```
 
 ## Formatting using astyle
