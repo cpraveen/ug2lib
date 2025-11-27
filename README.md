@@ -33,6 +33,8 @@ visit -o cylinder.vtk
 gmsh test_msh.msh
 ```
 
+You can use `make` to generate meshes from all the `geo` files in this directory.
+
 ## Test first order FV code: `src/ccfv1.cc`
 
 ```
@@ -51,6 +53,12 @@ make ccfv2 PROBLEM=CONT_ROT
 make ccfv2 PROBLEM=DISC_ROT
 make ccfv2 PROBLEM=PERIODIC_X   # enable periodic in geo file
 make ccfv2 PROBLEM=PERIODIC_XY  # enable periodic in geo file
+```
+
+In the `tests` directory, run the code
+
+```shell
+../src/ccfv2 input.txt
 ```
 
 ## Formatting using astyle

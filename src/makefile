@@ -44,6 +44,7 @@ ccfv2.o: $(INC) ccfv2.cc
 	$(CXX) $(CXXFLAGS) -D$(PROBLEM) -c ccfv2.cc
 
 ccfv2: $(OBJ) ccfv2.o
+	@echo "Compiling ccfv2 for $(PROBLEM)"
 	$(CXX) -o ccfv2 ccfv2.o $(OBJ)
 #------------------------------------------------------------------------------
 help:
