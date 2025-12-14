@@ -86,3 +86,9 @@ To understand the methods used in this code, you can refer to the following two 
 
  * Shashwat Tiwari
  * Praveen Chandrashekar
+
+ ---
+
+ * `Origin`: https://codeberg.org/cpraveen/ug2lib
+ * `Mirror`: https://git.sr.ht/~cpraveen/ug2lib
+ * `Mirror`: https://github.com/cpraveen/ug2lib
